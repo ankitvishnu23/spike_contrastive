@@ -66,13 +66,13 @@ class SimCLR(object):
         logging.info(f"Training with gpu: {self.args.disable_cuda}.")
 
         for epoch_counter in range(self.args.epochs):
-            for images, _ in tqdm(train_loader):
-                images = torch.cat(images, dim=0)
+            for wf in tqdm(train_loader):
+                wf = torch.cat(wf, dim=0)
 
-                images = images.to(self.args.device)
+                wf = wf.to(self.args.device)
 
                 with autocast(enabled=self.args.fp16_precision):
-                    features = self.model(images)
+                    features = self.model(wf)
                     logits, labels = self.info_nce_loss(features)
                     loss = self.criterion(logits, labels)
 
@@ -84,10 +84,10 @@ class SimCLR(object):
                 scaler.update()
 
                 if n_iter % self.args.log_every_n_steps == 0:
-                    top1, top5 = accuracy(logits, labels, topk=(1, 5))
+                    # top1, top5 = accuracy(logits, labels, topk=(1, 5))
                     self.writer.add_scalar('loss', loss, global_step=n_iter)
-                    self.writer.add_scalar('acc/top1', top1[0], global_step=n_iter)
-                    self.writer.add_scalar('acc/top5', top5[0], global_step=n_iter)
+                    # self.writer.add_scalar('acc/top1', top1[0], global_step=n_iter)
+                    # self.writer.add_scalar('acc/top5', top5[0], global_step=n_iter)
                     self.writer.add_scalar('learning_rate', self.scheduler.get_lr()[0], global_step=n_iter)
 
                 n_iter += 1
@@ -95,7 +95,7 @@ class SimCLR(object):
             # warmup for the first 10 epochs
             if epoch_counter >= 10:
                 self.scheduler.step()
-            logging.debug(f"Epoch: {epoch_counter}\tLoss: {loss}\tTop1 accuracy: {top1[0]}")
+            logging.debug(f"Epoch: {epoch_counter}\tLoss: {loss}")
 
         logging.info("Training has finished.")
         # save model checkpoints
