@@ -68,7 +68,7 @@ class SmartNoise(object):
     """
     # root_folder = '/home/av3016/spike_sorting/nyu47_templates/'
     # root_folder = '/Users/ankit/Documents/PaninskiLab/nyu47_templates/'
-    root_folder = '/home/jovyan/datastores/nyu47-templates'
+    root_folder = '/home/jovyan/datastores/nyu47-templates/'
     cov_name = 'temporal_cov_example.npy'
 
     def __init__(self, temporal_cov=None):
@@ -97,7 +97,7 @@ class Collide(object):
     """
     # root_folder = '/home/av3016/spike_sorting/nyu47_templates/'
     # root_folder = '/Users/ankit/Documents/PaninskiLab/nyu47_templates/'
-    root_folder = '/home/jovyan/datastores/nyu47-templates'
+    root_folder = '/home/jovyan/datastores/nyu47-templates/'
     temp_name = 'kilo_hptp_mcs.npy'
 
     def __init__(self, templates=None):
