@@ -16,7 +16,7 @@ class SimCLR(object):
 
     def __init__(self, *args, **kwargs):
         self.args = kwargs['args']
-        self.model = kwargs['model'].to(self.args.device)
+        self.model = kwargs['model'].double().to(self.args.device)
         self.optimizer = kwargs['optimizer']
         self.scheduler = kwargs['scheduler']
         self.writer = SummaryWriter()
@@ -69,7 +69,7 @@ class SimCLR(object):
             for wf in tqdm(train_loader):
                 wf = torch.cat(wf, dim=0)
 
-                wf = wf.to(self.args.device)
+                wf = wf.double().to(self.args.device)
 
                 with autocast(enabled=self.args.fp16_precision):
                     features = self.model(wf)

@@ -16,7 +16,7 @@ from torchvision import transforms, utils
 from torch.distributions.uniform import Uniform
 from torch.distributions.multivariate_normal import MultivariateNormal
 from torch.distributions.bernoulli import Bernoulli
-from torchaudio.transforms import Resample
+# from torchaudio.transforms import Resample
 
 # Ignore warnings
 import warnings
