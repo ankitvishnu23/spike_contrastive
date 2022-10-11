@@ -9,7 +9,7 @@ class ModelSimCLR(nn.Module):
 
     def __init__(self, base_model, out_dim):
         super(ModelSimCLR, self).__init__()
-        self.model_dict = { "basic_backbone": SingleChanDenoiser(),
+        self.model_dict = { "basic_backbone": SingleChanDenoiser(out_size=out_dim),
                             "resnet18": models.resnet18(pretrained=False, num_classes=out_dim),
                             "resnet50": models.resnet50(pretrained=False, num_classes=out_dim)}
 
@@ -36,7 +36,7 @@ class SingleChanDenoiser(nn.Module):
     """Cleaned up a little. Why is conv3 here and commented out in forward?"""
 
     def __init__(
-        self, n_filters=[16, 8, 4], filter_sizes=[5, 11, 21], spike_size=121
+        self, n_filters=[16, 8, 4], filter_sizes=[5, 11, 21], spike_size=121, out_size=2
     ):
         super(SingleChanDenoiser, self).__init__()
         feat1, feat2, feat3 = n_filters
@@ -45,7 +45,7 @@ class SingleChanDenoiser(nn.Module):
         self.conv2 = nn.Sequential(nn.Conv1d(feat1, feat2, size2), nn.ReLU())
         self.conv3 = nn.Sequential(nn.Conv1d(feat2, feat3, size3), nn.ReLU())
         n_input_feat = feat2 * (spike_size - size1 - size2 + 2)
-        self.fc = nn.Linear(n_input_feat, spike_size)
+        self.fc = nn.Linear(n_input_feat, out_size)
 
     def forward(self, x):
         x = x[:, None]
