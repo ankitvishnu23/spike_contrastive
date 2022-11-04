@@ -68,7 +68,9 @@ class SmartNoise(object):
     temporal_name = 'temporal_cov_example.npy'
     spatial_name = 'spatial_cov_example.npy'
 
-    def __init__(self, temporal_cov=None, spatial_cov=None):
+    def __init__(self, root_folder=None, temporal_cov=None, spatial_cov=None):
+        if root_folder is not None:
+            self.root_folder = root_folder
         if temporal_cov is None:
             temporal_cov = np.load(os.path.join(self.root_folder, self.temporal_name))
         if spatial_cov is None:
@@ -113,7 +115,9 @@ class Collide(object):
     root_folder = '/home/jovyan/nyu47-templates/'
     temp_name = 'temps_train.npy'
 
-    def __init__(self, templates=None):
+    def __init__(self, root_folder=None, templates=None):
+        if root_folder is not None:
+            self.root_folder = root_folder
         if templates is None:
             templates = np.load(os.path.join(self.root_folder, self.temp_name))
         # assert isinstance(templates, (array, array))
