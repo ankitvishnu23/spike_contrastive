@@ -11,7 +11,7 @@ model_names = sorted(name for name in models.__dict__
                      and callable(models.__dict__[name]))
 
 parser = argparse.ArgumentParser(description='PyTorch SimCLR')
-parser.add_argument('-data', metavar='DIR', default='/home/av3016/spike_sorting/nyu47_templates/',
+parser.add_argument('-data', metavar='DIR', default='/home/jovyan/nyu47_templates/',
                     help='path to dataset')
 parser.add_argument('-dataset-name', default='wfs',
                     help='dataset name', choices=['wfs', 'stl10', 'cifar10'])
@@ -22,9 +22,9 @@ parser.add_argument('-a', '--arch', metavar='ARCH', default='basic_backbone',
                          ' (default: basic_backbone)')
 parser.add_argument('-j', '--workers', default=12, type=int, metavar='N',
                     help='number of data loading workers (default: 32)')
-parser.add_argument('--epochs', default=200, type=int, metavar='N',
+parser.add_argument('--epochs', default=300, type=int, metavar='N',
                     help='number of total epochs to run')
-parser.add_argument('-b', '--batch-size', default=256, type=int,
+parser.add_argument('-b', '--batch-size', default=512, type=int,
                     metavar='N',
                     help='mini-batch size (default: 256), this is the total '
                          'batch size of all GPUs on the current node when '

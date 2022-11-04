@@ -6,8 +6,6 @@ import torch
 import pandas as pd
 from skimage import io, transform
 import numpy as np
-import h5py
-import random
 import scipy as sp
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
@@ -66,15 +64,17 @@ class SmartNoise(object):
             matched to output_size. If int, smaller of image edges is matched
             to output_size keeping aspect ratio the same.
     """
-    # root_folder = '/home/av3016/spike_sorting/nyu47_templates/'
-    # root_folder = '/Users/ankit/Documents/PaninskiLab/nyu47_templates/'
-    root_folder = '/home/jovyan/datastores/nyu47-templates/'
-    cov_name = 'temporal_cov_example.npy'
+    root_folder = '/home/jovyan/nyu47-templates/'
+    temporal_name = 'temporal_cov_example.npy'
+    spatial_name = 'spatial_cov_example.npy'
 
-    def __init__(self, temporal_cov=None):
+    def __init__(self, temporal_cov=None, spatial_cov=None):
         if temporal_cov is None:
-            temporal_cov = np.load(self.root_folder + self.cov_name)
+            temporal_cov = np.load(os.path.join(self.root_folder, self.temporal_name))
+        if spatial_cov is None:
+            spatial_cov = np.load(os.path.join(self.root_folder + self.spatial_name))
         self.temporal_cov = temporal_cov
+        self.spatial_cov = spatial_cov
 
     def __call__(self, sample):
         wf = sample
@@ -82,7 +82,20 @@ class SmartNoise(object):
 
         assert self.temporal_cov.shape[0] == w
 
-        noise_wf = np.random.multivariate_normal(np.zeros(w), self.temporal_cov)
+        n_neigh, _ = self.spatial_cov.shape
+        waveform_length, _ = self.temporal_cov.shape
+
+        noise = np.random.normal(size=(waveform_length, n_neigh))
+
+        for c in range(n_neigh):
+            noise[:, c] = np.matmul(noise[:, c], self.temporal_cov)
+            reshaped_noise = np.reshape(noise, (-1, n_neigh))
+
+        the_noise = np.reshape(np.matmul(reshaped_noise, self.spatial_cov),
+                           (waveform_length, n_neigh))
+
+        noise_sel = np.random.choice(n_neigh)
+        noise_wf = the_noise[:, noise_sel]
         wf = np.add(wf, noise_wf)
 
         return wf
@@ -97,12 +110,12 @@ class Collide(object):
     """
     # root_folder = '/home/av3016/spike_sorting/nyu47_templates/'
     # root_folder = '/Users/ankit/Documents/PaninskiLab/nyu47_templates/'
-    root_folder = '/home/jovyan/datastores/nyu47-templates/'
-    temp_name = 'kilo_hptp_mcs.npy'
+    root_folder = '/home/jovyan/nyu47-templates/'
+    temp_name = 'temps_train.npy'
 
     def __init__(self, templates=None):
         if templates is None:
-            templates = np.load(self.root_folder+self.temp_name)
+            templates = np.load(os.path.join(self.root_folder, self.temp_name))
         # assert isinstance(templates, (array, array))
         self.templates = templates
 

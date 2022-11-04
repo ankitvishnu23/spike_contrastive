@@ -12,7 +12,7 @@ from data_aug.wf_data_augs import AmpJitter, Jitter, Collide, Noise, SmartNoise,
 from typing import Any, Callable, Optional, Tuple
 
 class WFDataset(Dataset):
-    filename = "kilo_hptp_mcs.npy"
+    filename = "temps_train.npy"
 
     def __init__(
         self,
@@ -26,6 +26,7 @@ class WFDataset(Dataset):
 
         # now load the numpy array
         self.data = np.load(root + self.filename)
+        print(self.data.shape)
         self.root = root
         self.transform = transform
 
@@ -70,13 +71,13 @@ class ContrastiveLearningDataset:
         return data_transforms
     
     @staticmethod
-    def get_wf_pipeline_transform(self, temp_cov_fn):
+    def get_wf_pipeline_transform(self, temp_cov_fn, spatial_cov_fn):
         temporal_cov = np.load(self.root_folder + temp_cov_fn)
-        print(temporal_cov.shape)
+        spatial_cov = np.load(self.root_folder + spatial_cov_fn)
         """Return a set of data augmentation transformations on waveforms."""
         data_transforms = transforms.Compose([transforms.RandomApply([AmpJitter()], p=0.7),
                                               transforms.RandomApply([Jitter()], p=0.6),
-                                              transforms.RandomApply([SmartNoise(temporal_cov)], p=0.5),
+                                              transforms.RandomApply([SmartNoise(temporal_cov, spatial_cov)], p=0.5),
                                               transforms.RandomApply([Collide()], p=0.4),
                                               ToWfTensor()])
         
@@ -84,9 +85,11 @@ class ContrastiveLearningDataset:
 
     def get_dataset(self, name, n_views):
         temp_cov_fn = 'temporal_cov_example.npy'
+        spatial_cov_fn = 'spatial_cov_example.npy'
         valid_datasets = {'wfs': lambda: WFDataset(self.root_folder,
                                                               transform=ContrastiveLearningViewGenerator(
-                                                                  self.get_wf_pipeline_transform(self, temp_cov_fn),
+                                                                  self.get_wf_pipeline_transform(self, temp_cov_fn,
+                                                                  spatial_cov_fn),
                                                                   n_views)),
                           'cifar10': lambda: datasets.CIFAR10(self.root_folder, train=True,
                                                               transform=ContrastiveLearningViewGenerator(
