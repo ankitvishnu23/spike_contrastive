@@ -113,7 +113,7 @@ class Collide(object):
     # root_folder = '/home/av3016/spike_sorting/nyu47_templates/'
     # root_folder = '/Users/ankit/Documents/PaninskiLab/nyu47_templates/'
     root_folder = '/home/jovyan/nyu47-templates/'
-    temp_name = 'temps_train.npy'
+    temp_name = 'spikes_train.npy'
 
     def __init__(self, root_folder=None, templates=None):
         if root_folder is not None:
