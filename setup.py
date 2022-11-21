@@ -17,6 +17,7 @@ install_requires = [
     "pillow",
     "scikit-image",
     "sklearn",
+    "tensorboard",
     "torchtyping",
     "torchvision",
     "typeguard",
