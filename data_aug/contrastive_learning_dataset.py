@@ -12,7 +12,7 @@ from data_aug.wf_data_augs import AmpJitter, Jitter, Collide, Noise, SmartNoise,
 from typing import Any, Callable, Optional, Tuple
 
 class WFDataset(Dataset):
-    filename = "temps_train.npy"
+    filename = "spikes_train.npy"
 
     def __init__(
         self,
