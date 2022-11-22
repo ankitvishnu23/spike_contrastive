@@ -9,17 +9,15 @@ class ModelSimCLR(nn.Module):
 
     def __init__(self, base_model, out_dim):
         super(ModelSimCLR, self).__init__()
-        self.model_dict = { "basic_backbone": Encoder(out_size=out_dim),
+        self.model_dict = { "custom_encoder": Encoder(out_size=out_dim),
+                            "denoiser": SingleChanDenoiser(out_size=out_dim),
                             "resnet18": models.resnet18(pretrained=False, num_classes=out_dim),
                             "resnet50": models.resnet50(pretrained=False, num_classes=out_dim)}
 
         self.backbone = self._get_basemodel(base_model)
-        # dim_mlp = self.backbone.fc.in_features
-
-        # add mlp projection head
-        # self.backbone.fc = nn.Sequential(nn.Linear(dim_mlp, dim_mlp), nn.ReLU(), self.backbone.fc)
-
-        # self.backbone.fcpart = nn.Sequential(self.backbone.fcpart, Projector(hidden_dim=out_dim))
+        if base_model == "denoiser":
+            # add mlp projection head
+            self.backbone.fc = nn.Sequential(self.backbone.fc, Projector(hidden_dim=out_dim))
 
     def _get_basemodel(self, model_name):
         try:
@@ -67,14 +65,14 @@ class Projector(nn.Module):
     ''' Projector network accepts a variable number of layers indicated by depth.
     Option to include batchnorm after every layer.'''
 
-    def __init__(self, Lvpj=[30, 10], hidden_dim=2, bnorm = False, depth = 2):
+    def __init__(self, Lvpj=[30, 8], hidden_dim=2, bnorm = False, depth = 2):
         super(Projector, self).__init__()
         print(f"Using projector; batchnorm {bnorm} with depth {depth}")
         nlayer = [nn.BatchNorm1d(Lvpj[0])] if bnorm else []
         list_layers = [nn.Linear(hidden_dim, Lvpj[0])] + nlayer + [nn.ReLU()]
         for _ in range(depth-2):
             list_layers += [nn.Linear(Lvpj[0], Lvpj[0])] + nlayer + [nn.ReLU()]
-        list_layers += [nn.Linear(Lvpj[0],Lvpj[1])]
+        list_layers += [nn.Linear(Lvpj[0],hidden_dim)]
         self.proj_block = nn.Sequential(*list_layers)
 
     def forward(self, x):
@@ -83,20 +81,20 @@ class Projector(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, Lv=[100, 50, 50, 25], ks=21, out_size=2):
+    def __init__(self, Lv=[200, 150, 100, 75], ks=[11, 21, 31], spike_size=121, out_size = 2):
         super(Encoder, self).__init__()
         self.enc_block1d = nn.Sequential(
-            nn.Conv1d(1, Lv[0], ks),
+            nn.Conv1d(in_channels=1, out_channels=Lv[0], kernel_size=ks[0], padding=math.ceil((ks[0]-1)/2)),
             nn.BatchNorm1d(Lv[0]),
             nn.ReLU(),
             nn.MaxPool1d(2),
             # nn.Dropout(p=0.2),
-            nn.Conv1d(Lv[0], Lv[1], ks,stride=1),
+            nn.Conv1d(Lv[0], Lv[1], ks[1], padding=math.ceil((ks[1]-1)/2)),
             nn.BatchNorm1d(Lv[1]),
             nn.ReLU(),
             nn.MaxPool1d(4),
             # nn.Dropout(p=0.2),
-            nn.Conv2d(Lv[1], Lv[2], ks),
+            nn.Conv1d(Lv[1], Lv[2], ks[2], padding=math.ceil((ks[2]-1)/2)),
             nn.BatchNorm1d(Lv[2]),
             nn.ReLU(),
             nn.MaxPool1d(4)

@@ -6,20 +6,13 @@ from data_aug.contrastive_learning_dataset import ContrastiveLearningDataset
 from models.model_simclr import ModelSimCLR
 from simclr import SimCLR
 
-model_names = sorted(name for name in models.__dict__
-                     if name.islower() and not name.startswith("__")
-                     and callable(models.__dict__[name]))
-
 parser = argparse.ArgumentParser(description='PyTorch SimCLR')
-parser.add_argument('--data', metavar='DIR', default='/home/jovyan/nyu47_templates/',
+parser.add_argument('--data', metavar='DIR', default='/home/jovyan/dy016/',
                     help='path to dataset')
 parser.add_argument('-dataset-name', default='wfs',
                     help='dataset name', choices=['wfs', 'stl10', 'cifar10'])
-parser.add_argument('-a', '--arch', metavar='ARCH', default='basic_backbone',
-                    choices=model_names,
-                    help='model architecture: ' +
-                         ' | '.join(model_names) +
-                         ' (default: basic_backbone)')
+parser.add_argument('-a', '--arch', metavar='ARCH', default='custom_encoder',
+                    help='default: custom_encoder)')
 parser.add_argument('-j', '--workers', default=12, type=int, metavar='N',
                     help='number of data loading workers (default: 32)')
 parser.add_argument('--epochs', default=300, type=int, metavar='N',
