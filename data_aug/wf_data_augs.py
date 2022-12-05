@@ -110,8 +110,6 @@ class Collide(object):
             matched to output_size. If int, smaller of image edges is matched
             to output_size keeping aspect ratio the same.
     """
-    # root_folder = '/home/av3016/spike_sorting/nyu47_templates/'
-    # root_folder = '/Users/ankit/Documents/PaninskiLab/nyu47_templates/'
     root_folder = '/home/jovyan/nyu47-templates/'
     temp_name = 'spikes_train.npy'
 

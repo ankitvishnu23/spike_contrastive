@@ -1,6 +1,7 @@
 from fileinput import filename
 import torch
 import numpy as np
+import os
 
 from torchvision.transforms import transforms
 from data_aug.gaussian_blur import GaussianBlur
@@ -72,8 +73,8 @@ class ContrastiveLearningDataset:
     
     @staticmethod
     def get_wf_pipeline_transform(self, temp_cov_fn, spatial_cov_fn):
-        temporal_cov = np.load(self.root_folder + temp_cov_fn)
-        spatial_cov = np.load(self.root_folder + spatial_cov_fn)
+        temporal_cov = np.load(os.path.join(self.root_folder, temp_cov_fn))
+        spatial_cov = np.load(os.path.join(self.root_folder, spatial_cov_fn))
         """Return a set of data augmentation transformations on waveforms."""
         data_transforms = transforms.Compose([transforms.RandomApply([AmpJitter()], p=0.7),
                                               transforms.RandomApply([Jitter()], p=0.6),

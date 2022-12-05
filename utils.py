@@ -58,22 +58,26 @@ def get_contr_representations(model, data_set, device):
     model = model.double()
     for item in data_set:
         with torch.no_grad():
-            rep = model(torch.from_numpy(item.reshape(1, 1, -1).to(device)).double())
-        reps.append(rep.numpy())
+            wf = torch.from_numpy(item.reshape(1, 1, -1)).double().to(device)
+            rep = model(wf)
+        reps.append(rep.detach().cpu().numpy())
     
     return np.squeeze(np.array(reps))
+
 
 def knn_pca_score(latent_dim, root_path):
     pca = PCA(latent_dim)
 
-    # create labels vectors
-    labels_train = np.array([[i for j in range(1200)] \
-                                for i in range(5)]).reshape(-1)
-    labels_test = np.array([[i for j in range(300)] \
-                               for i in range(5)]).reshape(-1)
-
     train_data = np.load(os.path.join(root_path, 'spikes_train.npy'))
     test_data = np.load(os.path.join(root_path, 'spikes_test.npy'))
+
+    num_classes = train_data.shape[0] // 1200
+
+    # create labels vectors
+    labels_train = np.array([[i for j in range(1200)] \
+                                for i in range(num_classes)]).reshape(-1)
+    labels_test = np.array([[i for j in range(300)] \
+                               for i in range(num_classes)]).reshape(-1)
     
     # fit PCA to raw train
     pca_train = pca.fit_transform(train_data)
@@ -92,13 +96,16 @@ def knn_pca_score(latent_dim, root_path):
 
 def validation(model, latent_dim, root_path, device):
     # create labels vectors
-    labels_train = np.array([[i for j in range(1200)] \
-                                for i in range(5)]).reshape(-1)
-    labels_test = np.array([[i for j in range(300)] \
-                               for i in range(5)]).reshape(-1)
-
     train_data = np.load(os.path.join(root_path, 'spikes_train.npy'))
     test_data = np.load(os.path.join(root_path, 'spikes_test.npy'))
+
+    num_classes = train_data.shape[0] // 1200
+
+    # create labels vectors
+    labels_train = np.array([[i for j in range(1200)] \
+                                for i in range(num_classes)]).reshape(-1)
+    labels_test = np.array([[i for j in range(300)] \
+                               for i in range(num_classes)]).reshape(-1)
 
     # get model without projection head
     enc = get_backbone(model)
@@ -111,6 +118,6 @@ def validation(model, latent_dim, root_path, device):
     knn = KNeighborsClassifier(n_neighbors = 10)
     knn.fit(contr_train_reps, labels_train)
     contr_score = knn.score(contr_test_reps, labels_test)*100
-    print("n-components: {} - Contrastive reps classifier accuracy: {:.2f}%".format(latent_dim, contr_score) )
+    print("latent dim: {} - Contrastive reps classifier accuracy: {:.2f}%".format(latent_dim, contr_score) )
     
     return contr_score
