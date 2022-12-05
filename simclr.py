@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from torch.cuda.amp import GradScaler, autocast
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
-from utils import save_config_file, accuracy, save_checkpoint
+from utils import save_config_file, validation, save_checkpoint, knn_pca_score
 
 torch.manual_seed(0)
 
@@ -65,11 +65,12 @@ class SimCLR(object):
         logging.info(f"Start SimCLR training for {self.args.epochs} epochs.")
         logging.info(f"Training with gpu: {self.args.disable_cuda}.")
 
+        pca_score = knn_pca_score(self.args.out_dim, self.args.data)
+
         for epoch_counter in range(self.args.epochs):
+            print('Epoch {}'.format(epoch_counter))
             for wf in tqdm(train_loader):
-                # print(wf.shape)
                 wf = torch.cat(wf, dim=0)
-                # print(wf.shape)
                 wf = torch.squeeze(wf)
                 wf = torch.unsqueeze(wf, dim=1)
 
@@ -88,10 +89,10 @@ class SimCLR(object):
                 scaler.update()
 
                 if n_iter % self.args.log_every_n_steps == 0:
-                    top1, top5 = accuracy(logits, labels, topk=(1, 5))
+                    contr_score = validation(self.model, self.args.out_dim, self.args.data)
                     self.writer.add_scalar('loss', loss, global_step=n_iter)
-                    self.writer.add_scalar('acc/top1', top1[0], global_step=n_iter)
-                    self.writer.add_scalar('acc/top5', top5[0], global_step=n_iter)
+                    self.writer.add_scalar('pca_knn_score', pca_score, global_step=n_iter)
+                    self.writer.add_scalar('contr_knn_score', contr_score, global_step=n_iter)
                     self.writer.add_scalar('learning_rate', self.scheduler.get_lr()[0], global_step=n_iter)
 
                 n_iter += 1
