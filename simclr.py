@@ -89,7 +89,7 @@ class SimCLR(object):
                 scaler.update()
 
                 if n_iter % self.args.log_every_n_steps == 0:
-                    contr_score = validation(self.model, self.args.out_dim, self.args.data)
+                    contr_score = validation(self.model, self.args.out_dim, self.args.data, self.args.device)
                     self.writer.add_scalar('loss', loss, global_step=n_iter)
                     self.writer.add_scalar('pca_knn_score', pca_score, global_step=n_iter)
                     self.writer.add_scalar('contr_knn_score', contr_score, global_step=n_iter)

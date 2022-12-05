@@ -53,12 +53,12 @@ def get_backbone(enc):
     return enc
 
 
-def get_contr_representations(model, data_set):
+def get_contr_representations(model, data_set, device):
     reps = []
     model = model.double()
     for item in data_set:
         with torch.no_grad():
-            rep = model(torch.from_numpy(item.reshape(1, 1, -1)).double())
+            rep = model(torch.from_numpy(item.reshape(1, 1, -1).to(device)).double())
         reps.append(rep.numpy())
     
     return np.squeeze(np.array(reps))
@@ -90,7 +90,7 @@ def knn_pca_score(latent_dim, root_path):
     return pca_score
 
 
-def validation(model, latent_dim, root_path):
+def validation(model, latent_dim, root_path, device):
     # create labels vectors
     labels_train = np.array([[i for j in range(1200)] \
                                 for i in range(5)]).reshape(-1)
@@ -104,8 +104,8 @@ def validation(model, latent_dim, root_path):
     enc = get_backbone(model)
 
     # get detached representations
-    contr_train_reps = get_contr_representations(enc, train_data)
-    contr_test_reps = get_contr_representations(enc, test_data)
+    contr_train_reps = get_contr_representations(enc, train_data, device)
+    contr_test_reps = get_contr_representations(enc, test_data, device)
 
     # Train and fit KNN classifier
     knn = KNeighborsClassifier(n_neighbors = 10)
