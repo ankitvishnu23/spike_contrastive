@@ -11,6 +11,8 @@ parser.add_argument('--data', metavar='DIR', default='/home/jovyan/dy016/',
                     help='path to dataset')
 parser.add_argument('-dataset-name', default='wfs',
                     help='dataset name', choices=['wfs', 'stl10', 'cifar10'])
+parser.add_argument('--optimizer', default='adam', choices = ['adam', 'sgd'], 
+                    help='optimizer')
 parser.add_argument('-a', '--arch', metavar='ARCH', default='custom_encoder',
                     help='default: custom_encoder)')
 parser.add_argument('-j', '--workers', default=12, type=int, metavar='N',
@@ -67,9 +69,12 @@ def main():
 
     model = ModelSimCLR(base_model=args.arch, out_dim=args.out_dim)
 
-    optimizer = torch.optim.Adam(model.parameters(), args.lr, weight_decay=args.weight_decay)
-
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=(args.epochs * len(train_loader)), eta_min=0,
+    if args.optimizer == 'adam':
+        optimizer = torch.optim.Adam(model.parameters(), args.lr, weight_decay=args.weight_decay)
+        scheduler = torch.optim.lr_scheduler.ConstantLR(optimizer)
+    else:
+        optimizer = torch.optim.SGD(model.parameters(), args.lr, weight_decay=args.weight_decay)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=(args.epochs * len(train_loader)), eta_min=0,
                                                            last_epoch=-1)
 
     #  It’s a no-op if the 'gpu_index' argument is a negative integer or None.
