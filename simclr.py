@@ -99,7 +99,7 @@ class SimCLR(object):
 
                 # warmup for the first 10 epochs
                 # if epoch_counter >= 10:
-                self.scheduler.step()
+                # self.scheduler.step()
 
             logging.debug(f"Epoch: {epoch_counter}\tLoss: {loss}")
 
