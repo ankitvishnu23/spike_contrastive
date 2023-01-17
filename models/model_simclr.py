@@ -4,11 +4,12 @@ import torch.nn as nn
 import torchvision.models as models
 
 from exceptions.exceptions import InvalidBackboneError
+from collections import OrderedDict
 
 
 class ModelSimCLR(nn.Module):
 
-    def __init__(self, base_model, out_dim):
+    def __init__(self, base_model, out_dim, ckpt=None):
         super(ModelSimCLR, self).__init__()
         self.model_dict = { "custom_encoder": Encoder(out_size=out_dim),
                             "denoiser": SingleChanDenoiser(out_size=out_dim),
@@ -66,7 +67,7 @@ class Projector(nn.Module):
     ''' Projector network accepts a variable number of layers indicated by depth.
     Option to include batchnorm after every layer.'''
 
-    def __init__(self, Lvpj=[30, 8], hidden_dim=2, bnorm = False, depth = 2):
+    def __init__(self, Lvpj=[30, 8], hidden_dim=5, bnorm = False, depth = 2):
         super(Projector, self).__init__()
         print(f"Using projector; batchnorm {bnorm} with depth {depth}")
         nlayer = [nn.BatchNorm1d(Lvpj[0])] if bnorm else []
@@ -117,6 +118,17 @@ class Encoder(nn.Module):
         x = x.view(-1, self.Lv[2] * 1 * 1)
         x = self.fcpart(x)
         return x
+
+    def load(self, fname_model):
+        checkpoint = torch.load(fname_model, map_location="cpu")
+        state_dict = checkpoint["state_dict"]
+        new_state_dict = OrderedDict()
+        for key in state_dict:
+            # if "backbone" in key and "fc" not in key:
+            new_key = '.'.join(key.split('.')[1:])
+            new_state_dict[new_key] = state_dict[key]
+        self.load_state_dict(new_state_dict)
+        return self
 
 
 def conv3x3(in_planes, out_planes):
