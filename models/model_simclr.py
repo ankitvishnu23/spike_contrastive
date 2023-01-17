@@ -85,6 +85,7 @@ class Projector(nn.Module):
 class Encoder(nn.Module):
     def __init__(self, Lv=[200, 150, 100, 75], ks=[11, 21, 31], spike_size=121, out_size = 2):
         super(Encoder, self).__init__()
+        self.proj_dim = out_size if out_size < 5 else 5
         self.enc_block1d = nn.Sequential(
             nn.Conv1d(in_channels=1, out_channels=Lv[0], kernel_size=ks[0], padding=math.ceil((ks[0]-1)/2)),
             nn.BatchNorm1d(Lv[0]),
@@ -108,7 +109,7 @@ class Encoder(nn.Module):
             nn.ReLU(),
             # nn.Dropout(p=0.2),
             nn.Linear(Lv[3], out_size),
-            Projector(hidden_dim=out_size)
+            Projector(hidden_dim=self.proj_dim)
             )
         self.Lv = Lv
 
