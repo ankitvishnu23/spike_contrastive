@@ -38,6 +38,8 @@ parser.add_argument('--fp16-precision', action='store_true',
 
 parser.add_argument('--out_dim', default=2, type=int,
                     help='feature dimension (default: 2)')
+parser.add_argument('--proj_dim', default=5, type=int,
+                    help='projection dimension (default: 5)')
 parser.add_argument('--log-every-n-steps', default=100, type=int,
                     help='Log every n steps')
 parser.add_argument('--temperature', default=0.07, type=float,
@@ -67,7 +69,7 @@ def main():
         train_dataset, batch_size=args.batch_size, shuffle=True,
         num_workers=args.workers, pin_memory=True, drop_last=True)
 
-    model = ModelSimCLR(base_model=args.arch, out_dim=args.out_dim)
+    model = ModelSimCLR(base_model=args.arch, out_dim=args.out_dim, proj_dim=args.proj_dim)
 
     if args.optimizer == 'adam':
         optimizer = torch.optim.Adam(model.parameters(), args.lr, weight_decay=args.weight_decay)

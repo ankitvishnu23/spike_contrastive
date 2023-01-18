@@ -9,9 +9,9 @@ from collections import OrderedDict
 
 class ModelSimCLR(nn.Module):
 
-    def __init__(self, base_model, out_dim, ckpt=None):
+    def __init__(self, base_model, out_dim, proj_dim, ckpt=None):
         super(ModelSimCLR, self).__init__()
-        self.model_dict = { "custom_encoder": Encoder(out_size=out_dim),
+        self.model_dict = { "custom_encoder": Encoder(out_size=out_dim, proj_dim=proj_dim),
                             "denoiser": SingleChanDenoiser(out_size=out_dim),
                             "resnet18": models.resnet18(pretrained=False, num_classes=out_dim),
                             "resnet50": models.resnet50(pretrained=False, num_classes=out_dim)}
@@ -83,9 +83,9 @@ class Projector(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, Lv=[200, 150, 100, 75], ks=[11, 21, 31], spike_size=121, out_size = 2):
+    def __init__(self, Lv=[200, 150, 100, 75], ks=[11, 21, 31], out_size = 2, proj_dim=5):
         super(Encoder, self).__init__()
-        self.proj_dim = out_size if out_size < 5 else 5
+        self.proj_dim = out_size if out_size < proj_dim else proj_dim
         self.enc_block1d = nn.Sequential(
             nn.Conv1d(in_channels=1, out_channels=Lv[0], kernel_size=ks[0], padding=math.ceil((ks[0]-1)/2)),
             nn.BatchNorm1d(Lv[0]),
