@@ -31,15 +31,19 @@ class AmpJitter(object):
             matched to output_size. If int, smaller of image edges is matched
             to output_size keeping aspect ratio the same.
     """
+    def __init__(self, lo=0.9, hi=1.1):
+        self.lo = lo
+        self.hi = hi
+
     def __call__(self, sample):
         wf = sample
         
-        amp_jit = np.random.uniform(0.9, 1.1)
+        amp_jit = np.random.uniform(self.lo, self.hi)
         wf = amp_jit * wf
     
         return wf
 
-class Noise(object):
+class GaussianNoise(object):
     """Rescale the image in a sample to a given size.
 
     Args:
@@ -167,12 +171,13 @@ class Jitter(object):
             to output_size keeping aspect ratio the same.
     """
 
-    def __init__(self, templates=None, up_factor=8, sample_rate=20000):
+    def __init__(self, templates=None, up_factor=8, sample_rate=20000, shift=2):
         assert isinstance(up_factor, (int))
         assert isinstance(sample_rate, (int))
         self.templates = templates
         self.up_factor = up_factor
         self.sample_rate = sample_rate
+        self.shift = shift
 
     def __call__(self, sample):
         wf = sample
@@ -198,7 +203,7 @@ class Jitter(object):
         #     axis=1)
         
 
-        shift = (2* np.random.binomial(1, 0.5)-1) * np.random.uniform(0, 2)
+        shift = (2* np.random.binomial(1, 0.5)-1) * np.random.uniform(0, self.shift)
         
         idx_selection = np.random.choice(self.up_factor)
         wf = up_shifted_temp[idx_selection]
