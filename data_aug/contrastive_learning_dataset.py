@@ -9,7 +9,7 @@ from torchvision import transforms, datasets
 from torch.utils.data import Dataset
 from data_aug.view_generator import ContrastiveLearningViewGenerator
 from exceptions.exceptions import InvalidDatasetSelection
-from data_aug.wf_data_augs import AmpJitter, Jitter, Collide, Noise, SmartNoise, ToWfTensor
+from data_aug.wf_data_augs import AmpJitter, Jitter, Collide, GaussianNoise, SmartNoise, ToWfTensor
 from typing import Any, Callable, Optional, Tuple
 
 class WFDataset(Dataset):

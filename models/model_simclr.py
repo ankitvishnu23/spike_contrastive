@@ -19,7 +19,7 @@ class ModelSimCLR(nn.Module):
         self.backbone = self._get_basemodel(base_model)
         if base_model == "denoiser":
             # add mlp projection head
-            self.backbone.fc = nn.Sequential(self.backbone.fc, Projector(hidden_dim=out_dim))
+            self.backbone.fc = nn.Sequential(self.backbone.fc, Projector(rep_dim=out_dim, proj_dim=proj_dim))
 
     def _get_basemodel(self, model_name):
         try:
@@ -67,14 +67,14 @@ class Projector(nn.Module):
     ''' Projector network accepts a variable number of layers indicated by depth.
     Option to include batchnorm after every layer.'''
 
-    def __init__(self, Lvpj=[30, 8], hidden_dim=5, bnorm = False, depth = 2):
+    def __init__(self, Lvpj=[30, 8], rep_dim=5, proj_dim=5, bnorm = False, depth = 2):
         super(Projector, self).__init__()
         print(f"Using projector; batchnorm {bnorm} with depth {depth}")
         nlayer = [nn.BatchNorm1d(Lvpj[0])] if bnorm else []
-        list_layers = [nn.Linear(hidden_dim, Lvpj[0])] + nlayer + [nn.ReLU()]
+        list_layers = [nn.Linear(rep_dim, Lvpj[0])] + nlayer + [nn.ReLU()]
         for _ in range(depth-2):
             list_layers += [nn.Linear(Lvpj[0], Lvpj[0])] + nlayer + [nn.ReLU()]
-        list_layers += [nn.Linear(Lvpj[0],hidden_dim)]
+        list_layers += [nn.Linear(Lvpj[0], proj_dim)]
         self.proj_block = nn.Sequential(*list_layers)
 
     def forward(self, x):
@@ -109,7 +109,7 @@ class Encoder(nn.Module):
             nn.ReLU(),
             # nn.Dropout(p=0.2),
             nn.Linear(Lv[3], out_size),
-            Projector(hidden_dim=self.proj_dim)
+            Projector(rep_dim=out_size, proj_dim=self.proj_dim)
             )
         self.Lv = Lv
 
