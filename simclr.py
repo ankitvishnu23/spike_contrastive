@@ -93,13 +93,14 @@ class SimCLR(object):
                     self.writer.add_scalar('loss', loss, global_step=n_iter)
                     self.writer.add_scalar('pca_knn_score', pca_score, global_step=n_iter)
                     self.writer.add_scalar('contr_knn_score', contr_score, global_step=n_iter)
-                    self.writer.add_scalar('learning_rate', self.scheduler.get_lr()[0], global_step=n_iter)
+                    curr_lr = self.optimizer.param_groups[0]['lr'][0] if self.scheduler == None else self.scheduler.get_lr()[0]
+                    self.writer.add_scalar('learning_rate', curr_lr, global_step=n_iter)
 
                 n_iter += 1
 
                 # warmup for the first 10 epochs
-                # if epoch_counter >= 10:
-                self.scheduler.step()
+                if epoch_counter >= 10 and self.scheduler != None:
+                    self.scheduler.step()   
 
             logging.debug(f"Epoch: {epoch_counter}\tLoss: {loss}")
 
