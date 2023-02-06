@@ -70,7 +70,7 @@ class ContrastiveLearningDataset:
                                               GaussianBlur(kernel_size=int(0.1 * size)),
                                               transforms.ToTensor()])
         return data_transforms
-    
+
     @staticmethod
     def get_wf_pipeline_transform(self, temp_cov_fn, spatial_cov_fn):
         temporal_cov = np.load(os.path.join(self.root_folder, temp_cov_fn))
@@ -78,7 +78,7 @@ class ContrastiveLearningDataset:
         """Return a set of data augmentation transformations on waveforms."""
         data_transforms = transforms.Compose([transforms.RandomApply([AmpJitter()], p=0.7),
                                               transforms.RandomApply([Jitter()], p=0.6),
-                                              transforms.RandomApply([SmartNoise(self.root_folder, temporal_cov, spatial_cov)], p=0.5),
+                                            #   transforms.RandomApply([SmartNoise(self.root_folder, temporal_cov, spatial_cov)], p=0.5),
                                             #   transforms.RandomApply([Collide(self.root_folder)], p=0.8),
                                               ToWfTensor()])
         
