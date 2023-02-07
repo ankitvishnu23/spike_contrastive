@@ -11,10 +11,12 @@ parser.add_argument('--data', metavar='DIR', default='/home/jovyan/dy016/',
                     help='path to dataset')
 parser.add_argument('-dataset-name', default='wfs',
                     help='dataset name', choices=['wfs', 'stl10', 'cifar10'])
-parser.add_argument('--optimizer', default='adam', choices = ['adam', 'sgd'], 
+parser.add_argument('--optimizer', default='adam', choices = ['adam', 'sgd'],
                     help='optimizer')
 parser.add_argument('-a', '--arch', metavar='ARCH', default='custom_encoder',
                     help='default: custom_encoder)')
+parser.add_argument('-ns', '--noise_scale', default=1,
+                    help='how much to scale the noise augmentation (default: 1)')
 parser.add_argument('-j', '--workers', default=12, type=int, metavar='N',
                     help='number of data loading workers (default: 32)')
 parser.add_argument('--epochs', default=300, type=int, metavar='N',
@@ -35,7 +37,6 @@ parser.add_argument('--disable-cuda', action='store_true',
                     help='Disable CUDA')
 parser.add_argument('--fp16-precision', action='store_true',
                     help='Whether or not to use 16-bit precision GPU training.')
-
 parser.add_argument('--out_dim', default=2, type=int,
                     help='feature dimension (default: 2)')
 parser.add_argument('--proj_dim', default=5, type=int,
@@ -63,7 +64,7 @@ def main():
 
     dataset = ContrastiveLearningDataset(args.data)
 
-    train_dataset = dataset.get_dataset(args.dataset_name, args.n_views)
+    train_dataset = dataset.get_dataset(args.dataset_name, args.n_view, args.noise_scale)
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=args.batch_size, shuffle=True,

@@ -72,25 +72,26 @@ class ContrastiveLearningDataset:
         return data_transforms
 
     @staticmethod
-    def get_wf_pipeline_transform(self, temp_cov_fn, spatial_cov_fn):
+    def get_wf_pipeline_transform(self, temp_cov_fn, spatial_cov_fn, noise_scale):
         temporal_cov = np.load(os.path.join(self.root_folder, temp_cov_fn))
         spatial_cov = np.load(os.path.join(self.root_folder, spatial_cov_fn))
         """Return a set of data augmentation transformations on waveforms."""
         data_transforms = transforms.Compose([transforms.RandomApply([AmpJitter()], p=0.7),
                                               transforms.RandomApply([Jitter()], p=0.6),
-                                              transforms.RandomApply([SmartNoise(self.root_folder, temporal_cov, spatial_cov)], p=0.5),
+                                              transforms.RandomApply([SmartNoise(self.root_folder, temporal_cov, spatial_cov, noise_scale)], p=0.5),
                                             #   transforms.RandomApply([Collide(self.root_folder)], p=0.8),
                                               ToWfTensor()])
         
         return data_transforms
 
-    def get_dataset(self, name, n_views):
+    def get_dataset(self, name, n_views, noise_scale=1):
         temp_cov_fn = 'temporal_cov_example.npy'
         spatial_cov_fn = 'spatial_cov_example.npy'
         valid_datasets = {'wfs': lambda: WFDataset(self.root_folder,
                                                               transform=ContrastiveLearningViewGenerator(
                                                                   self.get_wf_pipeline_transform(self, temp_cov_fn,
-                                                                  spatial_cov_fn),
+                                                                  spatial_cov_fn,
+                                                                  noise_scale),
                                                                   n_views)),
                           'cifar10': lambda: datasets.CIFAR10(self.root_folder, train=True,
                                                               transform=ContrastiveLearningViewGenerator(
