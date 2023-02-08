@@ -64,7 +64,7 @@ def main():
 
     dataset = ContrastiveLearningDataset(args.data)
 
-    train_dataset = dataset.get_dataset(args.dataset_name, args.n_view, args.noise_scale)
+    train_dataset = dataset.get_dataset(args.dataset_name, args.n_views, args.noise_scale)
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset, batch_size=args.batch_size, shuffle=True,
