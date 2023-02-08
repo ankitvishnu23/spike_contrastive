@@ -102,7 +102,8 @@ class SmartNoise(object):
                            (waveform_length, n_neigh))
 
         noise_sel = np.random.choice(n_neigh)
-        noise_wf = self.noise_scale * the_noise[:, noise_sel]
+        noise_wf = the_noise[:, noise_sel]
+        noise_wf = np.multiply(self.noise_scale, noise_wf)
         wf = np.add(wf, noise_wf)
 
         return wf
