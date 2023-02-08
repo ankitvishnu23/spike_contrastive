@@ -84,7 +84,7 @@ class ContrastiveLearningDataset:
         
         return data_transforms
 
-    def get_dataset(self, name, n_views, noise_scale=1):
+    def get_dataset(self, name, n_views, noise_scale=1.0):
         temp_cov_fn = 'temporal_cov_example.npy'
         spatial_cov_fn = 'spatial_cov_example.npy'
         valid_datasets = {'wfs': lambda: WFDataset(self.root_folder,

@@ -15,7 +15,7 @@ parser.add_argument('--optimizer', default='adam', choices = ['adam', 'sgd'],
                     help='optimizer')
 parser.add_argument('-a', '--arch', metavar='ARCH', default='custom_encoder',
                     help='default: custom_encoder)')
-parser.add_argument('-ns', '--noise_scale', default=1,
+parser.add_argument('-ns', '--noise_scale', default=1.0,
                     help='how much to scale the noise augmentation (default: 1)')
 parser.add_argument('-j', '--workers', default=12, type=int, metavar='N',
                     help='number of data loading workers (default: 32)')

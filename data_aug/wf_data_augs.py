@@ -72,7 +72,7 @@ class SmartNoise(object):
     temporal_name = 'temporal_cov_example.npy'
     spatial_name = 'spatial_cov_example.npy'
 
-    def __init__(self, root_folder=None, temporal_cov=None, spatial_cov=None, noise_scale=1):
+    def __init__(self, root_folder=None, temporal_cov=None, spatial_cov=None, noise_scale=1.0):
         if root_folder is not None:
             self.root_folder = root_folder
         if temporal_cov is None:
@@ -81,7 +81,7 @@ class SmartNoise(object):
             spatial_cov = np.load(os.path.join(self.root_folder + self.spatial_name))
         self.temporal_cov = temporal_cov
         self.spatial_cov = spatial_cov
-        self.noise_scale = noise_scale
+        self.noise_scale = np.float64(noise_scale)
 
     def __call__(self, sample):
         wf = sample
@@ -103,7 +103,7 @@ class SmartNoise(object):
 
         noise_sel = np.random.choice(n_neigh)
         noise_wf = the_noise[:, noise_sel]
-        noise_wf = np.multiply(self.noise_scale, noise_wf)
+        noise_wf = self.noise_scale * noise_wf
         wf = np.add(wf, noise_wf)
 
         return wf
