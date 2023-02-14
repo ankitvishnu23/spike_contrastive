@@ -2,12 +2,14 @@ from __future__ import print_function, division
 from array import array
 import os
 import math
-import torch
 import pandas as pd
-from skimage import io, transform
 import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
+from skimage import io, transform
+from sklearn.decomposition import PCA
+
+import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils
@@ -231,6 +233,35 @@ class Jitter(object):
         wf_final = temp
 
         return wf_final
+
+
+class PCA_Reproj(object):
+    """Rescale the image in a sample to a given size.
+
+    Args:
+        output_size (tuple or int): Desired output size. If tuple, output is
+            matched to output_size. If int, smaller of image edges is matched
+            to output_size keeping aspect ratio the same.
+    """
+    root_folder = '/datastores/dy016'
+    spikes_file = 'spikes_train.npy'
+
+    def __init__(self, root_folder=None, spikes_file=None, pca_dim=10):
+        assert isinstance(pca_dim, (int))
+        if root_folder is not None:
+            self.root_folder = root_folder
+        if spikes_file is not None:
+            self.spikes_file = spikes_file
+        self.spikes = np.load(os.path.join(self.root_folder, self.spikes_file))
+        self.pca_dim = pca_dim
+        self.pca_ = PCA(n_components=self.pca_dim).fit(self.spikes)
+        self.spikes_mean = np.mean(self.spikes, axis=0)
+
+    def __call__(self, sample):
+        transform = self.pca_.transform(sample.reshape(1, -1))
+        recon = self.pca_.inverse_transform(transform)[0] + self.spikes_mean
+
+        return recon
 
     
 class ToWfTensor(object):
