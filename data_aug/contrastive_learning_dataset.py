@@ -55,8 +55,9 @@ class WFDataset(Dataset):
 
 
 class ContrastiveLearningDataset:
-    def __init__(self, root_folder):
+    def __init__(self, root_folder, lat_dim):
         self.root_folder = root_folder
+        self.lat_dim = lat_dim
     
 
     @staticmethod
@@ -92,7 +93,7 @@ class ContrastiveLearningDataset:
                                                               transform=ContrastiveLearningViewGenerator(
                                                                   self.get_wf_pipeline_transform(self, temp_cov_fn,
                                                                   spatial_cov_fn,
-                                                                  noise_scale),
+                                                                  noise_scale), PCA_Reproj(root_folder=self.root_folder, pca_dim=self.lat_dim),
                                                                   n_views)),
                           'cifar10': lambda: datasets.CIFAR10(self.root_folder, train=True,
                                                               transform=ContrastiveLearningViewGenerator(
