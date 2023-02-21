@@ -12,4 +12,4 @@ class ContrastiveLearningViewGenerator(object):
         self.n_views = n_views
 
     def __call__(self, x):
-        return [self.freq_transform(x), x]
+        return [self.freq_transform(x), self.base_transform(x)]

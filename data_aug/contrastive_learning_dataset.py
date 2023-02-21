@@ -77,10 +77,11 @@ class ContrastiveLearningDataset:
         temporal_cov = np.load(os.path.join(self.root_folder, temp_cov_fn))
         spatial_cov = np.load(os.path.join(self.root_folder, spatial_cov_fn))
         """Return a set of data augmentation transformations on waveforms."""
-        data_transforms = transforms.Compose([transforms.RandomApply([AmpJitter()], p=0.7),
-                                              transforms.RandomApply([Jitter()], p=0.6),
-                                              transforms.RandomApply([PCA_Reproj(root_folder=self.root_folder)], p=0.4),
-                                              transforms.RandomApply([SmartNoise(self.root_folder, temporal_cov, spatial_cov, noise_scale)], p=1.0),
+        data_transforms = transforms.Compose([
+                                            # transforms.RandomApply([AmpJitter()], p=0.7),
+                                            #   transforms.RandomApply([Jitter()], p=0.6),
+                                            #   transforms.RandomApply([PCA_Reproj(root_folder=self.root_folder)], p=0.4),
+                                              transforms.RandomApply([SmartNoise(self.root_folder, temporal_cov, spatial_cov, noise_scale)], p=0.5),
                                             #   transforms.RandomApply([Collide(self.root_folder)], p=0.8),
                                               ToWfTensor()])
         
