@@ -259,7 +259,7 @@ class PCA_Reproj(object):
 
     def __call__(self, sample):
         transform = self.pca_.transform(sample.reshape(1, -1))
-        recon = self.pca_.inverse_transform(transform)[0] + self.spikes_mean
+        recon = self.pca_.inverse_transform(transform)[0]
 
         return recon
 
