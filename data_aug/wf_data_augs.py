@@ -246,7 +246,7 @@ class PCA_Reproj(object):
     root_folder = '/datastores/dy016'
     spikes_file = 'spikes_train.npy'
 
-    def __init__(self, root_folder=None, spikes_file=None, pca_dim=10):
+    def __init__(self, root_folder=None, spikes_file=None, pca_dim=5):
         assert isinstance(pca_dim, (int))
         if root_folder is not None:
             self.root_folder = root_folder
