@@ -78,6 +78,7 @@ class SimCLR(object):
 
                 with autocast(enabled=self.args.fp16_precision):
                     features = self.model(wf)
+                    print(features.shape)
                     logits, labels = self.info_nce_loss(features)
                     loss = self.criterion(logits, labels)
 
