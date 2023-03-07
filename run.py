@@ -14,7 +14,7 @@ parser.add_argument('-dataset-name', default='wfs',
 parser.add_argument('--optimizer', default='adam', choices = ['adam', 'sgd'],
                     help='optimizer')
 parser.add_argument('-a', '--arch', metavar='ARCH', default='custom_encoder',
-                    help='default: custom_encoder)')
+                    help='default: custom_encoder (options: fc_encoder, denoiser)')
 parser.add_argument('-ns', '--noise_scale', default=1.0,
                     help='how much to scale the noise augmentation (default: 1)')
 parser.add_argument('-j', '--workers', default=12, type=int, metavar='N',
@@ -61,7 +61,7 @@ def main():
     else:
         args.device = torch.device('cpu')
         args.gpu_index = -1
-
+ 
     dataset = ContrastiveLearningDataset(args.data, args.out_dim)
 
     train_dataset = dataset.get_dataset(args.dataset_name, args.n_views, args.noise_scale)

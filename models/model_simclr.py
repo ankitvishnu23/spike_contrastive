@@ -12,6 +12,7 @@ class ModelSimCLR(nn.Module):
     def __init__(self, base_model, out_dim, proj_dim, ckpt=None):
         super(ModelSimCLR, self).__init__()
         self.model_dict = { "custom_encoder": Encoder(out_size=out_dim, proj_dim=proj_dim),
+                            "fc_encoder": FullyConnectedEnc(out_size=out_dim, proj_dim=proj_dim),
                             "denoiser": SingleChanDenoiser(out_size=out_dim),
                             "resnet18": models.resnet18(pretrained=False, num_classes=out_dim),
                             "resnet50": models.resnet50(pretrained=False, num_classes=out_dim)}
@@ -81,9 +82,8 @@ class Projector(nn.Module):
         x = self.proj_block(x)
         return x
 
-
 class Encoder(nn.Module):
-    def __init__(self, Lv=[200, 150, 100, 75], ks=[11, 21, 31], out_size = 2, proj_dim=5):
+    def __init__(self, Lv=[200, 150, 100, 75], ks=[11, 21, 31], out_size=2, proj_dim=5):
         super(Encoder, self).__init__()
         self.proj_dim = out_size if out_size < proj_dim else proj_dim
         self.enc_block1d = nn.Sequential(
@@ -117,6 +117,40 @@ class Encoder(nn.Module):
         x = self.enc_block1d(x)
         x = self.avgpool1d(x)
         x = x.view(-1, self.Lv[2] * 1 * 1)
+        x = self.fcpart(x)
+        return x
+
+    def load(self, fname_model):
+        checkpoint = torch.load(fname_model, map_location="cpu")
+        state_dict = checkpoint["state_dict"]
+        new_state_dict = OrderedDict()
+        for key in state_dict:
+            # if "backbone" in key and "fc" not in key:
+            new_key = '.'.join(key.split('.')[1:])
+            new_state_dict[new_key] = state_dict[key]
+        self.load_state_dict(new_state_dict)
+        return self
+
+
+class FullyConnectedEnc(nn.Module):
+    def __init__(self, Lv=[121, 550, 1100, 250], out_size=2, proj_dim=5):
+        super(FullyConnectedEnc, self).__init__()
+        self.proj_dim = out_size if out_size < proj_dim else proj_dim
+
+        self.fcpart = nn.Sequential(
+            nn.Linear(Lv[0], Lv[1]),
+            nn.ReLU(),
+            # nn.Dropout(p=0.2),
+            nn.Linear(Lv[1], Lv[2]),
+            nn.ReLU(),
+            nn.Linear(Lv[2], Lv[3]),
+            nn.ReLU(),
+            nn.Linear(Lv[3], out_size),
+            Projector(rep_dim=out_size, proj_dim=self.proj_dim)
+            )
+        self.Lv = Lv
+
+    def forward(self, x):
         x = self.fcpart(x)
         return x
 

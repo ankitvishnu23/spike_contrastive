@@ -87,6 +87,13 @@ class ContrastiveLearningDataset:
         
         return data_transforms
 
+    @staticmethod
+    def get_pca_transform(self):
+        data_transforms = transforms.Compose([PCA_Reproj(root_folder=self.root_folder, pca_dim=self.lat_dim),
+                                              ToWfTensor()])
+        
+        return data_transforms
+
     def get_dataset(self, name, n_views, noise_scale=1.0):
         temp_cov_fn = 'temporal_cov_example.npy'
         spatial_cov_fn = 'spatial_cov_example.npy'
@@ -94,7 +101,7 @@ class ContrastiveLearningDataset:
                                                               transform=ContrastiveLearningViewGenerator(
                                                                   self.get_wf_pipeline_transform(self, temp_cov_fn,
                                                                   spatial_cov_fn,
-                                                                  noise_scale), PCA_Reproj(root_folder=self.root_folder, pca_dim=self.lat_dim),
+                                                                  noise_scale), self.get_pca_transform(),
                                                                   n_views)),
                           'cifar10': lambda: datasets.CIFAR10(self.root_folder, train=True,
                                                               transform=ContrastiveLearningViewGenerator(
