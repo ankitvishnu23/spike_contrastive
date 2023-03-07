@@ -83,7 +83,7 @@ class Projector(nn.Module):
         return x
 
 class Encoder(nn.Module):
-    def __init__(self, Lv=[200, 150, 100, 75], ks=[11, 21, 31], out_size=2, proj_dim=5):
+    def __init__(self, Lv=[250, 200, 150, 75], ks=[4, 11, 21], out_size=2, proj_dim=5):
         super(Encoder, self).__init__()
         self.proj_dim = out_size if out_size < proj_dim else proj_dim
         self.enc_block1d = nn.Sequential(
