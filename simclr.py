@@ -28,6 +28,7 @@ class SimCLR(object):
         labels = torch.cat([torch.arange(self.args.batch_size) for i in range(self.args.n_views)], dim=0)
         labels = (labels.unsqueeze(0) == labels.unsqueeze(1)).float()
         labels = labels.to(self.args.device)
+        features = torch.squeeze(features)
 
         features = F.normalize(features, dim=1)
 
@@ -78,7 +79,6 @@ class SimCLR(object):
 
                 with autocast(enabled=self.args.fp16_precision):
                     features = self.model(wf)
-                    print(features.shape)
                     logits, labels = self.info_nce_loss(features)
                     loss = self.criterion(logits, labels)
 
