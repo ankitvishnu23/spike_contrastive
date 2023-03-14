@@ -7,33 +7,6 @@ from exceptions.exceptions import InvalidBackboneError
 from collections import OrderedDict
 
 
-class ModelSimCLR(nn.Module):
-
-    def __init__(self, base_model, out_dim, proj_dim, ckpt=None):
-        super(ModelSimCLR, self).__init__()
-        self.model_dict = { "custom_encoder": Encoder(out_size=out_dim, proj_dim=proj_dim),
-                            "denoiser": SingleChanDenoiser(out_size=out_dim),
-                            "resnet18": models.resnet18(pretrained=False, num_classes=out_dim),
-                            "resnet50": models.resnet50(pretrained=False, num_classes=out_dim)}
-
-        self.backbone = self._get_basemodel(base_model)
-        if base_model == "denoiser":
-            # add mlp projection head
-            self.backbone.fc = nn.Sequential(self.backbone.fc, Projector(rep_dim=out_dim, proj_dim=proj_dim))
-
-    def _get_basemodel(self, model_name):
-        try:
-            model = self.model_dict[model_name]
-        except KeyError:
-            raise InvalidBackboneError(
-                "Invalid backbone architecture. Check the config file and pass one of: basic_backbone, resnet18, or resnet50")
-        else:
-            return model
-
-    def forward(self, x):
-        return self.backbone(x)
-
-
 class SingleChanDenoiser(nn.Module):
     """Cleaned up a little. Why is conv3 here and commented out in forward?"""
 
@@ -69,7 +42,7 @@ class Projector(nn.Module):
 
     def __init__(self, Lvpj=[30, 8], rep_dim=5, proj_dim=5, bnorm = False, depth = 2):
         super(Projector, self).__init__()
-        print(f"Using projector; batchnorm {bnorm} with depth {depth}")
+        print(f"Using projector; batchnorm {bnorm} with depth {depth}; hidden_dim={Lvpj[0]}")
         nlayer = [nn.BatchNorm1d(Lvpj[0])] if bnorm else []
         list_layers = [nn.Linear(rep_dim, Lvpj[0])] + nlayer + [nn.ReLU()]
         for _ in range(depth-2):
@@ -82,9 +55,28 @@ class Projector(nn.Module):
         return x
 
 
+class Projector2(nn.Module):
+    ''' Projector network accepts a variable number of layers indicated by depth.
+    Option to include batchnorm after every layer.'''
+
+    def __init__(self, Lvpj=[128], rep_dim=5, proj_dim=5, bnorm = False, depth = 2):
+        super(Projector2, self).__init__()
+        print(f"Using projector; batchnorm {bnorm} with depth {depth}; hidden_dim={Lvpj[0]}")
+        nlayer = [nn.BatchNorm1d(Lvpj[0])] if bnorm else []
+        list_layers = [nn.Linear(rep_dim, Lvpj[0])] + nlayer + [nn.ReLU()]
+        for _ in range(depth-2):
+            list_layers += [nn.Linear(Lvpj[0], Lvpj[0])] + nlayer + [nn.ReLU()]
+        list_layers += [nn.Linear(Lvpj[0], proj_dim)]
+        self.proj_block = nn.Sequential(*list_layers)
+
+    def forward(self, x):
+        x = self.proj_block(x)
+        return x
+
 class Encoder(nn.Module):
-    def __init__(self, Lv=[200, 150, 100, 75], ks=[11, 21, 31], out_size = 2, proj_dim=5):
+    def __init__(self, Lv=[200, 150, 100, 75], ks=[11, 21, 31], out_size = 2, proj_dim=5, fc_depth=2):
         super(Encoder, self).__init__()
+        print("init Encoder")
         self.proj_dim = out_size if out_size < proj_dim else proj_dim
         self.enc_block1d = nn.Sequential(
             nn.Conv1d(in_channels=1, out_channels=Lv[0], kernel_size=ks[0], padding=math.ceil((ks[0]-1)/2)),
@@ -109,7 +101,7 @@ class Encoder(nn.Module):
             nn.ReLU(),
             # nn.Dropout(p=0.2),
             nn.Linear(Lv[3], out_size),
-            Projector(rep_dim=out_size, proj_dim=self.proj_dim)
+            # Projector(rep_dim=out_size, proj_dim=self.proj_dim)
             )
         self.Lv = Lv
 
@@ -131,7 +123,66 @@ class Encoder(nn.Module):
         self.load_state_dict(new_state_dict)
         return self
 
+class Encoder2(nn.Module):
+    def __init__(self, Lv=[64, 128, 256, 256, 256], ks=[11], out_size = 2, proj_dim=5, fc_depth=2):
+        super(Encoder2, self).__init__()
+        self.proj_dim = out_size if out_size < proj_dim else proj_dim
+        self.enc_block1d = nn.Sequential(
+            nn.Conv1d(in_channels=1, out_channels=Lv[0], kernel_size=ks[0], padding=math.ceil((ks[0]-1)/2)),
+            nn.BatchNorm1d(Lv[0]),
+            nn.ReLU(),
+            nn.MaxPool1d(2),
+            # nn.Dropout(p=0.2),
+            nn.Conv1d(Lv[0], Lv[1], ks[0], padding=math.ceil((ks[0]-1)/2)),
+            nn.BatchNorm1d(Lv[1]),
+            nn.ReLU(),
+            nn.MaxPool1d(4),
+            # nn.Dropout(p=0.2),
+            nn.Conv1d(Lv[1], Lv[2], ks[0], padding=math.ceil((ks[0]-1)/2)),
+            nn.BatchNorm1d(Lv[2]),
+            nn.ReLU(),
+            nn.MaxPool1d(4),
+            nn.Conv1d(Lv[2], Lv[3], ks[0], padding=math.ceil((ks[0]-1)/2)),
+            nn.BatchNorm1d(Lv[2]),
+            nn.ReLU(),
+        )
+        self.avgpool1d = nn.AdaptiveAvgPool1d((1))
+        list_layers = [nn.Linear(Lv[3] * 1 * 1, Lv[4]), nn.ReLU(inplace=True)]
+        for _ in range(fc_depth-2):
+            list_layers += [nn.Linear(Lv[4], Lv[4]), nn.ReLU(inplace=True)]
+        list_layers += [nn.Linear(Lv[4], out_size), nn.ReLU(inplace=True)]
+        
+        
+        self.fcpart = nn.Sequential(*list_layers)
+        
+        # nn.Sequential(
+        #     nn.Linear(Lv[2] * 1 * 1, Lv[3]),
+        #     nn.ReLU(),
+        #     # nn.Dropout(p=0.2),
+        #     nn.Linear(Lv[3], out_size),
+        #     )
+        self.Lv = Lv
+        # self.projector = Projector2(rep_dim=out_size, proj_dim=self.proj_dim)
+    def forward(self, x):
+        x = self.enc_block1d(x)
+        # print(x.shape)
+        x = self.avgpool1d(x)
+        x = x.view(-1, self.Lv[2] * 1 * 1)
+        x = self.fcpart(x)
+        # x = self.projector(x)
+        return x
 
+    def load(self, fname_model):
+        checkpoint = torch.load(fname_model, map_location="cpu")
+        state_dict = checkpoint["state_dict"]
+        new_state_dict = OrderedDict()
+        for key in state_dict:
+            # if "backbone" in key and "fc" not in key:
+            new_key = '.'.join(key.split('.')[1:])
+            new_state_dict[new_key] = state_dict[key]
+        self.load_state_dict(new_state_dict)
+        return self
+    
 def conv3x3(in_planes, out_planes):
     """3x3 convolution with padding"""
     return nn.Conv1d(in_planes, out_planes)
@@ -345,3 +396,37 @@ def resnet18(pretrained=False, progress=True, **kwargs):
     """
     return _resnet('resnet18', BasicBlock, [2, 2, 2, 2], pretrained, progress,
                    **kwargs)
+    
+
+model_dict = { "custom_encoder": Encoder,
+                           "custom_encoder2": Encoder2,
+                            "denoiser": SingleChanDenoiser,
+                            # "resnet18": models.resnet18(pretrained=False, num_classes=out_dim),
+                            # "resnet50": models.resnet50(pretrained=False, num_classes=out_dim)
+                            }
+
+class ModelSimCLR(nn.Module):
+
+    def __init__(self, base_model, out_dim, proj_dim, fc_depth=2, ckpt=None):
+        super(ModelSimCLR, self).__init__()
+        
+        self.backbone = model_dict[base_model](out_size=out_dim, proj_dim=proj_dim, fc_depth=fc_depth)
+
+        # self.backbone = self._get_basemodel(base_model)
+        print("number of encoder params: ", sum(p.numel() for p in self.backbone.parameters()))
+        if base_model == "denoiser":
+            # add mlp projection head
+            self.backbone.fc = nn.Sequential(self.backbone.fc, Projector(rep_dim=out_dim, proj_dim=proj_dim))
+
+    def _get_basemodel(self, model_name):
+        try:
+            model = self.model_dict[model_name]
+        except KeyError:
+            raise InvalidBackboneError(
+                "Invalid backbone architecture. Check the config file and pass one of: basic_backbone, resnet18, or resnet50")
+        else:
+            return model
+
+    def forward(self, x):
+        return self.backbone(x)
+

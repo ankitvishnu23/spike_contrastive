@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from torch.cuda.amp import GradScaler, autocast
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
-from utils import save_config_file, validation, save_checkpoint, knn_pca_score
+from utils import save_config_file, validation, save_checkpoint, knn_pca_score, knn_monitor
 
 torch.manual_seed(0)
 
@@ -16,10 +16,12 @@ class SimCLR(object):
 
     def __init__(self, *args, **kwargs):
         self.args = kwargs['args']
-        self.model = kwargs['model'].double().to(self.args.device)
+        # self.model = kwargs['model'].double().to(self.args.device)
+        self.model = kwargs['model'].to(self.args.device)
+        self.proj = kwargs['proj'].to(self.args.device)
         self.optimizer = kwargs['optimizer']
         self.scheduler = kwargs['scheduler']
-        self.writer = SummaryWriter()
+        self.writer = SummaryWriter('./logs/'+self.args.exp)
         logging.basicConfig(filename=os.path.join(self.writer.log_dir, 'training.log'), level=logging.DEBUG)
         self.criterion = torch.nn.CrossEntropyLoss().to(self.args.device)
 
@@ -54,18 +56,19 @@ class SimCLR(object):
         logits = logits / self.args.temperature
         return logits, labels
 
-    def train(self, train_loader):
+    def train(self, train_loader, memory_loader=None, test_loader=None):
 
         scaler = GradScaler(enabled=self.args.fp16_precision)
 
         # save config file
-        save_config_file(self.writer.log_dir, self.args)
+        save_config_file('./runs', self.args)
 
         n_iter = 0
         logging.info(f"Start SimCLR training for {self.args.epochs} epochs.")
         logging.info(f"Training with gpu: {self.args.disable_cuda}.")
 
-        pca_score = knn_pca_score(self.args.out_dim, self.args.data)
+        # pca_score = knn_pca_score(self.args.out_dim, self.args.data)
+        pca_score = 0
 
         for epoch_counter in range(self.args.epochs):
             print('Epoch {}'.format(epoch_counter))
@@ -74,10 +77,14 @@ class SimCLR(object):
                 wf = torch.squeeze(wf)
                 wf = torch.unsqueeze(wf, dim=1)
 
-                wf = wf.double().to(self.args.device)
+                # wf = wf.double().to(self.args.device)
+                wf = wf.float().to(self.args.device)
+                # print(wf.shape)
 
                 with autocast(enabled=self.args.fp16_precision):
                     features = self.model(wf)
+                    if self.proj is not None:
+                        features = self.proj(features)
                     logits, labels = self.info_nce_loss(features)
                     loss = self.criterion(logits, labels)
 
@@ -88,14 +95,13 @@ class SimCLR(object):
                 scaler.step(self.optimizer)
                 scaler.update()
 
-                if n_iter % self.args.log_every_n_steps == 0:
-                    contr_score = validation(self.model, self.args.out_dim, self.args.data, self.args.device)
-                    self.writer.add_scalar('loss', loss, global_step=n_iter)
-                    self.writer.add_scalar('pca_knn_score', pca_score, global_step=n_iter)
-                    self.writer.add_scalar('contr_knn_score', contr_score, global_step=n_iter)
-                    curr_lr = self.optimizer.param_groups[0]['lr'] if self.scheduler == None else self.scheduler.get_lr()[0]
-                    self.writer.add_scalar('learning_rate', curr_lr, global_step=n_iter)
-
+                knn_score = knn_monitor(net=self.model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True)
+                if n_iter % 10 == 0:
+                    knn_score = knn_monitor(net=self.model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True)
+                    print(f"loss: {loss}, knn_acc:{knn_score}")
+                # if n_iter % self.args.log_every_n_steps == 0:
+                    # contr_score = validation(self.model, self.args.out_dim, self.args.data, self.args.device)
+                
                 n_iter += 1
 
                 # warmup for the first 10 epochs
@@ -103,14 +109,20 @@ class SimCLR(object):
                     self.scheduler.step()   
 
             logging.debug(f"Epoch: {epoch_counter}\tLoss: {loss}")
+            self.writer.add_scalar('loss', loss, epoch_counter)
+            # self.writer.add_scalar('pca_knn_score', pca_score, global_step=n_iter)
+            self.writer.add_scalar('knn_score', knn_score, epoch_counter)
+            curr_lr = self.optimizer.param_groups[0]['lr'] if self.scheduler == None else self.scheduler.get_lr()[0]
+            self.writer.add_scalar('learning_rate', curr_lr, epoch_counter)
+
 
         logging.info("Training has finished.")
         # save model checkpoints
-        checkpoint_name = 'checkpoint_{:04d}.pth.tar'.format(self.args.epochs)
+        checkpoint_name = self.args.exp + '_checkpoint_{:04d}.pth.tar'.format(self.args.epochs)
         save_checkpoint({
             'epoch': self.args.epochs,
             'arch': self.args.arch,
             'state_dict': self.model.state_dict(),
             'optimizer': self.optimizer.state_dict(),
-        }, is_best=False, filename=os.path.join(self.writer.log_dir, checkpoint_name))
-        logging.info(f"Model checkpoint and metadata has been saved at {self.writer.log_dir}.")
+        }, is_best=False, filename=os.path.join('./runs', checkpoint_name))
+        logging.info(f"Model checkpoint and metadata has been saved at {'./runs'}.")

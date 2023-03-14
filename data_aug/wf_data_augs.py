@@ -83,7 +83,9 @@ class SmartNoise(object):
             spatial_cov = np.load(os.path.join(self.root_folder + self.spatial_name))
         self.temporal_cov = temporal_cov
         self.spatial_cov = spatial_cov
-        self.noise_scale = np.float64(noise_scale)
+        # self.noise_scale = np.float64(noise_scale)
+        self.noise_scale = np.float32(noise_scale)
+        
 
     def __call__(self, sample):
         wf = sample
