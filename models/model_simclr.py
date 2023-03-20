@@ -102,7 +102,7 @@ class Encoder(nn.Module):
             nn.ReLU(),
             # nn.Dropout(p=0.2),
             nn.Linear(Lv[3], out_size),
-            # Projector(rep_dim=out_size, proj_dim=self.proj_dim)
+            Projector(rep_dim=out_size, proj_dim=self.proj_dim)
             )
         self.Lv = Lv
 
@@ -152,7 +152,7 @@ class Encoder2(nn.Module):
         for _ in range(fc_depth-2):
             list_layers += [nn.Linear(Lv[4], Lv[4]), nn.ReLU(inplace=True)]
         list_layers += [nn.Linear(Lv[4], out_size), nn.ReLU(inplace=True)]
-        
+        list_layers += [Projector(rep_dim=out_size, proj_dim=self.proj_dim)]
         
         self.fcpart = nn.Sequential(*list_layers)
         
