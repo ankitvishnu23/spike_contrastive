@@ -39,7 +39,7 @@ class WFDataset(Dataset):
         Returns:
             tensor: wf
         """
-        wf = self.data[index]
+        wf = self.data[index].astype('float32')
 
         # doing this so that it is a tensor
         # wf = torch.from_numpy(wf)
@@ -53,6 +53,57 @@ class WFDataset(Dataset):
     def __len__(self) -> int:
         return len(self.data)
 
+
+class WFDataset_lab(Dataset):
+
+    def __init__(
+        self,
+        root: str,
+        split: str = 'train',
+        transform: Optional[Callable] = None,
+        
+    ) -> None:
+
+        super().__init__()
+        if split == 'train':
+            self.filename = "spikes_train.npy"
+            self.data = np.load(root + self.filename).astype('float32')
+            self.targets = np.array([[i for j in range(1200)] \
+                                for i in range(10)]).reshape(-1).astype('long')
+        elif split == 'test':
+            self.filename = "spikes_test.npy"
+            self.data = np.load(root + self.filename).astype('float32')
+            self.targets = np.array([[i for j in range(300)] \
+                                for i in range(10)]).reshape(-1).astype('long')
+            
+        # self.data: Any = []
+
+        # now load the numpy array
+        print(self.data.shape)
+        self.root = root
+        self.transform = transform
+
+    def __getitem__(self, index: int) -> Any :
+        """
+        Args:
+            index (int): Index
+
+        Returns:
+            tensor: wf
+        """
+        wf = self.data[index].astype('float32')
+        y = self.targets[index].astype('long')
+
+        # doing this so that it is a tensor
+        # wf = torch.from_numpy(wf)
+
+        if self.transform is not None:
+            wf = self.transform(wf)
+
+        return wf, y
+
+    def __len__(self) -> int:
+        return len(self.data)
 
 class ContrastiveLearningDataset:
     def __init__(self, root_folder, lat_dim):
@@ -121,3 +172,6 @@ class ContrastiveLearningDataset:
             raise InvalidDatasetSelection()
         else:
             return dataset_fn()
+    
+
+
