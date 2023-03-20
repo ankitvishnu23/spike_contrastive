@@ -174,7 +174,7 @@ class Encoder2(nn.Module):
         return x
 
 class FullyConnectedEnc(nn.Module):
-    def __init__(self, Lv=[121, 550, 1100, 250], out_size=2, proj_dim=5):
+    def __init__(self, Lv=[121, 550, 1100, 250], out_size=2, proj_dim=5, fc_depth=2):
         super(FullyConnectedEnc, self).__init__()
         self.proj_dim = out_size if out_size < proj_dim else proj_dim
 
