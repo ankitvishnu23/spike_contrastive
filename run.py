@@ -24,7 +24,7 @@ def main(args):
     tr_dataset = WFDataset_lab(args.data, split='train')
     te_dataset = WFDataset_lab(args.data, split='test')
     
-    dataset = ContrastiveLearningDataset(args.data)
+    dataset = ContrastiveLearningDataset(args.data, args.out_dim)
 
     train_dataset = dataset.get_dataset(args.dataset_name, args.n_views, args.noise_scale)
 
