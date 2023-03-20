@@ -48,6 +48,8 @@ def main(args):
             proj = Projector(rep_dim=args.out_dim, proj_dim=args.proj_dim)
         elif args.arch == 'custom_encoder2':
             proj = Projector2(rep_dim=args.out_dim, proj_dim=args.proj_dim)
+        elif args.arch == 'fc_encoder':
+            proj = Projector(rep_dim=args.out_dim, proj_dim=args.proj_dim)
     else:
         proj = None
     if args.optimizer == 'adam':
@@ -144,7 +146,7 @@ if __name__ == "__main__":
     parser.add_argument('--submit', action='store_true')
     parser.add_argument('--arg_str', default='--', type=str)
     parser.add_argument('--add_prefix', default='', type=str)
-    parser.add_argument('--no_proj', action='store_true')
+    parser.add_argument('--no_proj', default='True', action='store_true')
     
     args = parser.parse_args()
     
