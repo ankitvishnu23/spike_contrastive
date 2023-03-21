@@ -78,8 +78,8 @@ class SimCLR(object):
                 wf = torch.squeeze(wf)
                 wf = torch.unsqueeze(wf, dim=1)
 
-                # wf = wf.double().to(self.args.device)
-                wf = wf.float().to(self.args.device)
+                wf = wf.double().to(self.args.device)
+                # wf = wf.float().to(self.args.device)
                 # print(wf.shape)
 
                 with autocast(enabled=self.args.fp16_precision):
