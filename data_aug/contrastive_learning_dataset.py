@@ -133,7 +133,7 @@ class ContrastiveLearningDataset:
                                               transforms.RandomApply([Jitter()], p=0.6),
                                             #   transforms.RandomApply([PCA_Reproj(root_folder=self.root_folder)], p=0.4),
                                               transforms.RandomApply([SmartNoise(self.root_folder, temporal_cov, spatial_cov, noise_scale)], p=0.5),
-                                              transforms.RandomApply([Collide(self.root_folder)], p=0.4),
+                                            #   transforms.RandomApply([Collide(self.root_folder)], p=0.4),
                                               ToWfTensor()])
         
         return data_transforms
