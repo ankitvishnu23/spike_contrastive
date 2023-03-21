@@ -16,8 +16,8 @@ class SimCLR(object):
 
     def __init__(self, *args, **kwargs):
         self.args = kwargs['args']
-        # self.model = kwargs['model'].double().to(self.args.device)
-        self.model = kwargs['model'].to(self.args.device)
+        self.model = kwargs['model'].double().to(self.args.device)
+        # self.model = kwargs['model'].to(self.args.device)
         self.proj = kwargs['proj'].to(self.args.device) if kwargs['proj'] is not None else None
         self.optimizer = kwargs['optimizer']
         self.scheduler = kwargs['scheduler']
