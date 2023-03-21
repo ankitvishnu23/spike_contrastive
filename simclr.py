@@ -96,12 +96,13 @@ class SimCLR(object):
                 scaler.step(self.optimizer)
                 scaler.update()
 
-                knn_score = knn_monitor(net=self.model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True)
-                if n_iter % 10 == 0:
-                    knn_score = knn_monitor(net=self.model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True)
+                # knn_score = knn_monitor(net=self.model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True)
+                # if n_iter % 10 == 0:
+                #     knn_score = knn_monitor(net=self.model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True)
+                #     print(f"loss: {loss}, knn_acc:{knn_score}")
+                if n_iter % self.args.log_every_n_steps == 0:
+                    knn_score = validation(self.model, self.args.out_dim, self.args.data, self.args.device)
                     print(f"loss: {loss}, knn_acc:{knn_score}")
-                # if n_iter % self.args.log_every_n_steps == 0:
-                    # contr_score = validation(self.model, self.args.out_dim, self.args.data, self.args.device)
                 
                 n_iter += 1
 
