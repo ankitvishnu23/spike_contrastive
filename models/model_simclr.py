@@ -264,13 +264,9 @@ class AttentionEnc(nn.Module):
         Returns:
             output Tensor of shape [batch_size, proj_dim]
         """
-        print(src.size())
-        src = src.unsqueeze(dim=-1)
-        print(src.size())
+        src = torch.transpose(src, 1, 2)
         if self.expand_dim != 1:
             src = self.encoder(src)
-        print(src.size())
-        # src = src.squeeze()
         src = self.pos_encoder(src)
         output = self.transformer_encoder(src, src_mask)
         output = self.fcpart(output)
