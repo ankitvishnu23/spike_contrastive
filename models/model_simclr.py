@@ -240,7 +240,7 @@ class AttentionEnc(nn.Module):
             nhead = 1
         self.pos_encoder = PositionalEncoding(expand_dim, dropout, spike_size)
         encoder_layers = TransformerEncoderLayer(expand_dim, nhead, 512, batch_first=True)
-        self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers, norm=True)
+        self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers, norm=False)
         self.fcpart = nn.Sequential(
             nn.Linear(self.spike_size, 550),
             nn.ReLU(),
