@@ -258,12 +258,13 @@ class AttentionEnc(nn.Module):
     def forward(self, src, src_mask=None):
         """
         Args:
-            src: Tensor, shape [batch_size, seq_len, 1]
+            src: Tensor, shape [batch_size, seq_len]
             src_mask: Tensor, shape [seq_len, seq_len]
 
         Returns:
-            output Tensor of shape [seq_len, batch_size, ntoken]
+            output Tensor of shape [batch_size, proj_dim]
         """
+        src = src.unsqueeze(dim=-1)
         if self.expand_dim != 1:
             src = self.encoder(src)
         src = self.pos_encoder(src)
