@@ -215,9 +215,9 @@ class PositionalEncoding(nn.Module):
 
         position = torch.arange(max_len).unsqueeze(1)
         div_term = torch.exp(torch.arange(0, d_model, 2) * (-math.log(10000.0) / d_model))
-        pe = torch.zeros(max_len, 1, d_model)
-        pe[:, 0, 0::2] = torch.sin(position * div_term)
-        pe[:, 0, 1::2] = torch.cos(position * div_term)
+        pe = torch.zeros(1, max_len, d_model)
+        pe[0, :, 0::2] = torch.sin(position * div_term)
+        pe[0, :, 1::2] = torch.cos(position * div_term)
         self.register_buffer('pe', pe)
 
     def forward(self, x):
@@ -225,7 +225,7 @@ class PositionalEncoding(nn.Module):
         Args:
             x: Tensor, shape [seq_len, batch_size, embedding_dim]
         """
-        x = x + self.pe[:x.size(0)]
+        x = x + self.pe[:, :x.size(0)]
         return self.dropout(x)
 
 class AttentionEnc(nn.Module):
@@ -238,7 +238,7 @@ class AttentionEnc(nn.Module):
             self.encoder = nn.Linear(n_channels, expand_dim)
         else:
             nhead = 1
-        self.pos_encoder = PositionalEncoding(expand_dim, dropout)
+        self.pos_encoder = PositionalEncoding(expand_dim, dropout, spike_size)
         encoder_layers = TransformerEncoderLayer(expand_dim, nhead, 512, batch_first=True)
         self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers, norm=True)
         self.fcpart = nn.Sequential(
