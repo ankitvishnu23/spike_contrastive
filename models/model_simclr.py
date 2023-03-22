@@ -223,9 +223,10 @@ class PositionalEncoding(nn.Module):
     def forward(self, x):
         """
         Args:
-            x: Tensor, shape [seq_len, batch_size, embedding_dim]
+            x: Tensor, shape [batch_size, seq_len, embedding_dim]
         """
-        x = x + self.pe[:, :x.size(0)]
+        print(x.size())
+        x = x + self.pe[:, :x.size(1)]
         return self.dropout(x)
 
 class AttentionEnc(nn.Module):
