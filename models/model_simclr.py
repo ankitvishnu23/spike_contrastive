@@ -225,7 +225,6 @@ class PositionalEncoding(nn.Module):
         Args:
             x: Tensor, shape [batch_size, seq_len, embedding_dim]
         """
-        print(x.size())
         x = x + self.pe[:, :x.size(1)]
         return self.dropout(x)
 
@@ -265,9 +264,13 @@ class AttentionEnc(nn.Module):
         Returns:
             output Tensor of shape [batch_size, proj_dim]
         """
+        print(src.size())
         src = src.unsqueeze(dim=-1)
+        print(src.size())
         if self.expand_dim != 1:
             src = self.encoder(src)
+        print(src.size())
+        # src = src.squeeze()
         src = self.pos_encoder(src)
         output = self.transformer_encoder(src, src_mask)
         output = self.fcpart(output)
