@@ -2,6 +2,7 @@ import math
 import torch
 import torch.nn as nn
 import torchvision.models as models
+from torch.nn import TransformerEncoder, TransformerEncoderLayer
 
 from exceptions.exceptions import InvalidBackboneError
 from collections import OrderedDict
@@ -194,6 +195,81 @@ class FullyConnectedEnc(nn.Module):
     def forward(self, x):
         x = self.fcpart(x)
         return x
+
+    def load(self, fname_model):
+        checkpoint = torch.load(fname_model, map_location="cpu")
+        state_dict = checkpoint["state_dict"]
+        new_state_dict = OrderedDict()
+        for key in state_dict:
+            # if "backbone" in key and "fc" not in key:
+            new_key = '.'.join(key.split('.')[1:])
+            new_state_dict[new_key] = state_dict[key]
+        self.load_state_dict(new_state_dict)
+        return self
+
+class PositionalEncoding(nn.Module):
+
+    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):
+        super().__init__()
+        self.dropout = nn.Dropout(p=dropout)
+
+        position = torch.arange(max_len).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2) * (-math.log(10000.0) / d_model))
+        pe = torch.zeros(max_len, 1, d_model)
+        pe[:, 0, 0::2] = torch.sin(position * div_term)
+        pe[:, 0, 1::2] = torch.cos(position * div_term)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        """
+        Args:
+            x: Tensor, shape [seq_len, batch_size, embedding_dim]
+        """
+        x = x + self.pe[:x.size(0)]
+        return self.dropout(x)
+
+class AttentionEnc(nn.Module):
+    def __init__(self, spike_size=121, n_channels=1, out_size=2, proj_dim=5, fc_depth=2, nlayers=24, nhead=8, dropout=0.1, expand_dim=16):
+        super(AttentionEnc, self).__init__()
+        self.spike_size = spike_size
+        self.expand_dim = expand_dim
+        self.proj_dim = out_size if out_size < proj_dim else proj_dim
+        if expand_dim != 1:
+            self.encoder = nn.Linear(n_channels, expand_dim)
+        else:
+            nhead = 1
+        self.pos_encoder = PositionalEncoding(expand_dim, dropout)
+        encoder_layers = TransformerEncoderLayer(expand_dim, nhead, 512, batch_first=True)
+        self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers, norm=True)
+        self.fcpart = nn.Sequential(
+            nn.Linear(self.spike_size, 550),
+            nn.ReLU(),
+            # nn.Dropout(p=0.2),
+            nn.Linear(550, out_size),
+            Projector(rep_dim=out_size, proj_dim=self.proj_dim)
+        )
+
+    def init_weights(self) -> None:
+        initrange = 0.1
+        # self.encoder.weight.data.uniform_(-initrange, initrange)
+        self.fcpart.bias.data.zero_()
+        self.fpcart.weight.data.uniform_(-initrange, initrange)
+
+    def forward(self, src, src_mask=None):
+        """
+        Args:
+            src: Tensor, shape [batch_size, seq_len, 1]
+            src_mask: Tensor, shape [seq_len, seq_len]
+
+        Returns:
+            output Tensor of shape [seq_len, batch_size, ntoken]
+        """
+        if self.expand_dim != 1:
+            src = self.encoder(src)
+        src = self.pos_encoder(src)
+        output = self.transformer_encoder(src, src_mask)
+        output = self.fcpart(output)
+        return output
 
     def load(self, fname_model):
         checkpoint = torch.load(fname_model, map_location="cpu")
@@ -425,6 +501,7 @@ model_dict = { "custom_encoder": Encoder,
                            "custom_encoder2": Encoder2,
                             "denoiser": SingleChanDenoiser,
                             "fc_encoder": FullyConnectedEnc,
+                            "attention": AttentionEnc,
                             # "resnet18": models.resnet18(pretrained=False, num_classes=out_dim),
                             # "resnet50": models.resnet50(pretrained=False, num_classes=out_dim)
                             }
