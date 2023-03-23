@@ -242,10 +242,10 @@ class AttentionEnc(nn.Module):
         encoder_layers = TransformerEncoderLayer(expand_dim, nhead, 512, batch_first=True)
         self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
         self.fcpart = nn.Sequential(
-            nn.Linear(self.spike_size, 550),
+            nn.Linear(self.spike_size * expand_dim, 550 * expand_dim),
             nn.ReLU(),
             # nn.Dropout(p=0.2),
-            nn.Linear(550, out_size),
+            nn.Linear(550 * expand_dim, out_size),
             Projector(rep_dim=out_size, proj_dim=self.proj_dim)
         )
 
@@ -269,6 +269,7 @@ class AttentionEnc(nn.Module):
             src = self.encoder(src)
         src = self.pos_encoder(src)
         output = self.transformer_encoder(src, src_mask)
+        output = output.view(-1, self.spike_size * self.expand_dim)
         output = self.fcpart(output)
         return output
 
