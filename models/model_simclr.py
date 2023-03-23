@@ -229,7 +229,7 @@ class PositionalEncoding(nn.Module):
         return self.dropout(x)
 
 class AttentionEnc(nn.Module):
-    def __init__(self, spike_size=121, n_channels=1, out_size=2, proj_dim=5, fc_depth=2, nlayers=24, nhead=8, dropout=0.1, expand_dim=16):
+    def __init__(self, spike_size=121, n_channels=1, out_size=2, proj_dim=5, fc_depth=2, nlayers=8, nhead=4, dropout=0.1, expand_dim=16):
         super(AttentionEnc, self).__init__()
         self.spike_size = spike_size
         self.expand_dim = expand_dim
