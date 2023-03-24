@@ -266,7 +266,7 @@ class AttentionEnc(nn.Module):
         """
         src = torch.transpose(src, 1, 2)
         if self.expand_dim != 1:
-            src = self.encoder(src)
+            src = self.encoder(src) * math.sqrt(self.expand_dim)
         src = self.pos_encoder(src)
         output = self.transformer_encoder(src, src_mask)
         output = output.view(-1, self.spike_size * self.expand_dim)
