@@ -41,7 +41,7 @@ class Projector(nn.Module):
     ''' Projector network accepts a variable number of layers indicated by depth.
     Option to include batchnorm after every layer.'''
 
-    def __init__(self, Lvpj=[30, 8], rep_dim=5, proj_dim=5, bnorm = False, depth = 2):
+    def __init__(self, Lvpj=[512, 128], rep_dim=5, proj_dim=5, bnorm = False, depth = 2):
         super(Projector, self).__init__()
         print(f"Using projector; batchnorm {bnorm} with depth {depth}; hidden_dim={Lvpj[0]}")
         nlayer = [nn.BatchNorm1d(Lvpj[0])] if bnorm else []
@@ -242,10 +242,10 @@ class AttentionEnc(nn.Module):
         encoder_layers = TransformerEncoderLayer(expand_dim, nhead, 512, batch_first=True)
         self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
         self.fcpart = nn.Sequential(
-            nn.Linear(self.spike_size * expand_dim, 5 * self.spike_size * expand_dim),
+            nn.Linear(self.spike_size * expand_dim, out_size),
             nn.ReLU(),
             # nn.Dropout(p=0.2),
-            nn.Linear(5 * self.spike_size * expand_dim, out_size),
+            # nn.Linear(5 * self.spike_size * expand_dim, out_size),
             Projector(rep_dim=out_size, proj_dim=self.proj_dim)
         )
 
@@ -510,10 +510,13 @@ model_dict = { "custom_encoder": Encoder,
 
 class ModelSimCLR(nn.Module):
 
-    def __init__(self, base_model, out_dim, proj_dim, fc_depth=2, ckpt=None):
+    def __init__(self, base_model, out_dim, proj_dim, fc_depth=2, expand_dim=16, ckpt=None):
         super(ModelSimCLR, self).__init__()
         
-        self.backbone = model_dict[base_model](out_size=out_dim, proj_dim=proj_dim, fc_depth=fc_depth)
+        if base_model == "attention":
+            self.backbone = model_dict[base_model](out_size=out_dim, proj_dim=proj_dim, fc_depth=fc_depth, expand_dim=expand_dim)
+        else:
+            self.backbone = model_dict[base_model](out_size=out_dim, proj_dim=proj_dim, fc_depth=fc_depth)
 
         # self.backbone = self._get_basemodel(base_model)
         print("number of encoder params: ", sum(p.numel() for p in self.backbone.parameters()))
