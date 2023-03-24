@@ -152,7 +152,8 @@ class ContrastiveLearningDataset:
                                                               transform=ContrastiveLearningViewGenerator(
                                                                   self.get_wf_pipeline_transform(self, temp_cov_fn,
                                                                   spatial_cov_fn,
-                                                                  noise_scale), self.get_pca_transform(self),
+                                                                #   noise_scale), self.get_pca_transform(self),
+                                                                  noise_scale), None,
                                                                   n_views)),
                           'cifar10': lambda: datasets.CIFAR10(self.root_folder, train=True,
                                                               transform=ContrastiveLearningViewGenerator(
