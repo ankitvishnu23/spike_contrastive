@@ -42,7 +42,8 @@ def main(args):
     test_loader = torch.utils.data.DataLoader(
         test_dataset, batch_size=args.batch_size, shuffle=False,
         num_workers=args.workers, pin_memory=True, drop_last=False)
-    model = ModelSimCLR(base_model=args.arch, out_dim=args.out_dim, proj_dim=args.proj_dim, fc_depth=args.fc_depth)
+    model = ModelSimCLR(base_model=args.arch, out_dim=args.out_dim, proj_dim=args.proj_dim, \
+        fc_depth=args.fc_depth, expand_dim=args.expand_dim)
     if not args.no_proj:
         if args.arch == 'custom_encoder':
             proj = Projector(rep_dim=args.out_dim, proj_dim=args.proj_dim)
@@ -147,6 +148,8 @@ if __name__ == "__main__":
     parser.add_argument('--arg_str', default='--', type=str)
     parser.add_argument('--add_prefix', default='', type=str)
     parser.add_argument('--no_proj', default='True', action='store_true')
+    parser.add_argument('--expand_dim', default=16, action='store_true')
+
     
     args = parser.parse_args()
     
