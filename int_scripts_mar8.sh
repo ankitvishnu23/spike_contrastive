@@ -11,7 +11,23 @@ do
 python run.py --submit --arg_str="--out_dim=20 --proj_dim=10 --batch-size=512 --lr=${lr} "
 done
 
-for lr in 0.001 0.0001 0.00001 0.01
+
+for lr in 0.001 0.0001 0.01
 do
-python run.py --submit --arg_str="--out_dim=5 --proj_dim=5 --batch-size=512 --lr=${lr} --arch=attention --epochs=300"
+python run.py --submit --arg_str="--out_dim=5 --proj_dim=5 --batch-size=512 --lr=${lr} --arch=attention --epochs=500 "
+done
+
+for lr in 0.001 0.1 0.01 1 0.3
+do
+python run.py --submit --arg_str="--out_dim=5 --proj_dim=5 --batch-size=512 --lr=${lr} --arch=attention --epochs=500 --optimizer=sgd "
+done
+
+for lr in 0.001 0.0001 0.01
+do
+python run.py --submit --arg_str="--out_dim=5 --proj_dim=5 --batch-size=512 --lr=${lr} --arch=attention --epochs=500 --fc_depth=4 "
+done
+
+for lr in 0.001 0.1 0.01 1 0.3
+do
+python run.py --submit --arg_str="--out_dim=5 --proj_dim=5 --batch-size=512 --lr=${lr} --arch=attention --epochs=500 --optimizer=sgd --fc_depth=4 "
 done
