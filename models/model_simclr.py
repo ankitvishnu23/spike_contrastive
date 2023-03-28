@@ -291,6 +291,8 @@ class AttentionEnc(nn.Module):
             # if "backbone" in key and "fc" not in key:
             new_key = '.'.join(key.split('.')[1:])
             new_state_dict[new_key] = state_dict[key]
+            if 'pos_encoder' in key:
+                new_state_dict[new_key] = state_dict[key].transpose(0, 1)
         self.load_state_dict(new_state_dict)
         return self
     
