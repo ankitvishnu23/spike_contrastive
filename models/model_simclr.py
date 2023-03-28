@@ -41,7 +41,7 @@ class Projector(nn.Module):
     ''' Projector network accepts a variable number of layers indicated by depth.
     Option to include batchnorm after every layer.'''
 
-    def __init__(self, Lvpj=[512, 128], rep_dim=5, proj_dim=5, bnorm = False, depth = 2):
+    def __init__(self, Lvpj=[512, 128], rep_dim=5, proj_dim=5, bnorm = False, depth = 3):
         super(Projector, self).__init__()
         print(f"Using projector; batchnorm {bnorm} with depth {depth}; hidden_dim={Lvpj[0]}")
         nlayer = [nn.BatchNorm1d(Lvpj[0])] if bnorm else []
@@ -229,7 +229,7 @@ class PositionalEncoding(nn.Module):
         return self.dropout(x)
 
 class AttentionEnc(nn.Module):
-    def __init__(self, spike_size=121, n_channels=1, out_size=2, proj_dim=5, fc_depth=2, nlayers=8, nhead=4, dropout=0.1, expand_dim=16):
+    def __init__(self, spike_size=121, n_channels=1, out_size=2, proj_dim=5, fc_depth=2, nlayers=9, nhead=8, dropout=0.1, expand_dim=16):
         super(AttentionEnc, self).__init__()
         self.spike_size = spike_size
         self.expand_dim = expand_dim
@@ -241,13 +241,24 @@ class AttentionEnc(nn.Module):
         self.pos_encoder = PositionalEncoding(expand_dim, dropout, spike_size)
         encoder_layers = TransformerEncoderLayer(expand_dim, nhead, 512, batch_first=True)
         self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
-        self.fcpart = nn.Sequential(
-            nn.Linear(self.spike_size * expand_dim, out_size),
-            nn.ReLU(),
-            # nn.Dropout(p=0.2),
-            # nn.Linear(5 * self.spike_size * expand_dim, out_size),
-            Projector(rep_dim=out_size, proj_dim=self.proj_dim)
-        )
+        list_layers = [nn.Linear(self.spike_size * expand_dim, 256), nn.ReLU(inplace=True)]
+        for _ in range(fc_depth-2):
+            list_layers += [nn.Linear(256, 256), nn.ReLU(inplace=True)]
+        list_layers += [nn.Linear(256, out_size)]
+        list_layers += [Projector(rep_dim=out_size, proj_dim=self.proj_dim)]
+        
+        self.fcpart = nn.Sequential(*list_layers)
+        
+        # self.fcpart = nn.Sequential(
+        #     nn.Linear(self.spike_size * expand_dim, self.spike_size),
+        #     nn.ReLU(),
+        #     nn.Linear(self.spike_size, out_size),
+            
+        #     # nn.ReLU(),
+        #     # nn.Dropout(p=0.2),
+        #     # nn.Linear(5 * self.spike_size * expand_dim, out_size),
+        #     Projector(rep_dim=out_size, proj_dim=self.proj_dim)
+        # )
 
     def init_weights(self) -> None:
         initrange = 0.1
@@ -260,7 +271,6 @@ class AttentionEnc(nn.Module):
         Args:
             src: Tensor, shape [batch_size, seq_len]
             src_mask: Tensor, shape [seq_len, seq_len]
-
         Returns:
             output Tensor of shape [batch_size, proj_dim]
         """
@@ -490,7 +500,6 @@ def _resnet(block, layers, **kwargs):
 def resnet18(pretrained=False, progress=True, **kwargs):
     r"""ResNet-18 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
-
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
         progress (bool): If True, displays a progress bar of the download to stderr
@@ -520,6 +529,11 @@ class ModelSimCLR(nn.Module):
 
         # self.backbone = self._get_basemodel(base_model)
         print("number of encoder params: ", sum(p.numel() for p in self.backbone.parameters()))
+        print("number of transfomer params: ", sum(p.numel() for n,p in self.backbone.named_parameters() if 'transformer_encoder' in n))
+        print("number of fcpart params: ", sum(p.numel() for n,p in self.backbone.named_parameters() if ('fcpart' in n and 'proj' not in n)))
+        print("number of Proj params: ", sum(p.numel() for n,p in self.backbone.named_parameters() if ('fcpart' in n and 'proj' in n)))
+        
+        
         if base_model == "denoiser":
             # add mlp projection head
             self.backbone.fc = nn.Sequential(self.backbone.fc, Projector(rep_dim=out_dim, proj_dim=proj_dim))
@@ -535,4 +549,4 @@ class ModelSimCLR(nn.Module):
 
     def forward(self, x):
         return self.backbone(x)
-
+    
