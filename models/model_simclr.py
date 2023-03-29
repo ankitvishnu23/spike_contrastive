@@ -229,7 +229,7 @@ class PositionalEncoding(nn.Module):
         return self.dropout(x)
 
 class AttentionEnc(nn.Module):
-    def __init__(self, spike_size=121, n_channels=1, out_size=2, proj_dim=5, fc_depth=2, nlayers=9, nhead=8, dropout=0.1, expand_dim=16):
+    def __init__(self, spike_size=121, n_channels=1, out_size=2, proj_dim=5, fc_depth=2, nlayers=9, nhead=8, dropout=0.1, expand_dim=16, cls_head=None):
         super(AttentionEnc, self).__init__()
         self.spike_size = spike_size
         self.expand_dim = expand_dim
@@ -245,8 +245,21 @@ class AttentionEnc(nn.Module):
         for _ in range(fc_depth-2):
             list_layers += [nn.Linear(256, 256), nn.ReLU(inplace=True)]
         list_layers += [nn.Linear(256, out_size)]
-        list_layers += [Projector(rep_dim=out_size, proj_dim=self.proj_dim)]
-        
+        if not cls_head:
+            list_layers += [Projector(rep_dim=out_size, proj_dim=self.proj_dim)]
+        else:
+            print(f"using head = {cls_head}")
+            if cls_head == 'linear':
+                self.cls_head = nn.Linear(out_size, 10)
+            elif cls_head == 'mlp2':
+                self.cls_head = nn.Sequential(nn.Linear(out_size, 100), nn.ReLU(inplace=True), \
+                    nn.Linear(100, 10))
+            elif cls_head == 'mlp3':
+                self.cls_head = nn.Sequential(nn.Linear(out_size, 100), nn.ReLU(inplace=True), \
+                    nn.Linear(100, 50), nn.ReLU(inplace=True), \
+                    nn.Linear(50, 10))         
+            list_layers += [self.cls_head]
+            
         self.fcpart = nn.Sequential(*list_layers)
         
         # self.fcpart = nn.Sequential(
@@ -521,11 +534,11 @@ model_dict = { "custom_encoder": Encoder,
 
 class ModelSimCLR(nn.Module):
 
-    def __init__(self, base_model, out_dim, proj_dim, fc_depth=2, expand_dim=16, ckpt=None):
+    def __init__(self, base_model, out_dim, proj_dim, fc_depth=2, expand_dim=16, ckpt=None, cls_head=None):
         super(ModelSimCLR, self).__init__()
         
         if base_model == "attention":
-            self.backbone = model_dict[base_model](out_size=out_dim, proj_dim=proj_dim, fc_depth=fc_depth, expand_dim=expand_dim)
+            self.backbone = model_dict[base_model](out_size=out_dim, proj_dim=proj_dim, fc_depth=fc_depth, expand_dim=expand_dim, cls_head=cls_head)
         else:
             self.backbone = model_dict[base_model](out_size=out_dim, proj_dim=proj_dim, fc_depth=fc_depth)
 
@@ -534,6 +547,7 @@ class ModelSimCLR(nn.Module):
         print("number of transfomer params: ", sum(p.numel() for n,p in self.backbone.named_parameters() if 'transformer_encoder' in n))
         print("number of fcpart params: ", sum(p.numel() for n,p in self.backbone.named_parameters() if ('fcpart' in n and 'proj' not in n)))
         print("number of Proj params: ", sum(p.numel() for n,p in self.backbone.named_parameters() if ('fcpart' in n and 'proj' in n)))
+        print("number of classifier params: ", sum(p.numel() for n,p in self.backbone.named_parameters() if 'cls_head' in n))
         
         
         if base_model == "denoiser":
