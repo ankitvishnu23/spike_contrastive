@@ -209,15 +209,23 @@ class FullyConnectedEnc(nn.Module):
 
 class PositionalEncoding(nn.Module):
 
-    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):
+    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000, num_chans: int = 1):
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
+        self.num_chans = num_chans
 
         position = torch.arange(max_len).unsqueeze(1)
         div_term = torch.exp(torch.arange(0, d_model, 2) * (-math.log(10000.0) / d_model))
-        pe = torch.zeros(1, max_len, d_model)
-        pe[0, :, 0::2] = torch.sin(position * div_term)
-        pe[0, :, 1::2] = torch.cos(position * div_term)
+        if self.num_chans > 1:
+            pe = torch.zeros(1, self.num_chans, max_len, d_model)
+            for i in range(self.num_chans):
+                pe[1, i, :, 0::2] = torch.sin(position * div_term)
+                pe[1, i, :, 1::2] = torch.cos(position * div_term)
+        else:
+            pe = torch.zeros(1, max_len, d_model)
+            pe[0, :, 0::2] = torch.sin(position * div_term)
+            pe[0, :, 1::2] = torch.cos(position * div_term)
+
         self.register_buffer('pe', pe)
 
     def forward(self, x):
@@ -225,7 +233,11 @@ class PositionalEncoding(nn.Module):
         Args:
             x: Tensor, shape [batch_size, seq_len, embedding_dim]
         """
-        x = x + self.pe[:, :x.size(1)]
+        if self.num_chans > 1:
+            x = x + self.pe[:, :, :x.size(2)]
+        else:
+            x = x + self.pe[:, :, :x.size(1)]
+
         return self.dropout(x)
 
 class AttentionEnc(nn.Module):
@@ -321,7 +333,7 @@ class MultiChanAttentionEnc1(nn.Module):
             self.encoder = nn.Linear(1, expand_dim)
         else:
             nhead = 1
-        self.pos_encoder = PositionalEncoding(expand_dim, dropout, spike_size)
+        self.pos_encoder = PositionalEncoding(expand_dim, dropout, spike_size, True)
         encoder_layers = TransformerEncoderLayer(expand_dim, nhead, 512, batch_first=True)
         self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
         self.encoder_sum = nn.Linear(n_channels, 1)
