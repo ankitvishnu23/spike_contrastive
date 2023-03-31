@@ -14,6 +14,49 @@ from typing import Any, Callable, Optional, Tuple
 
 class WFDataset(Dataset):
     filename = "spikes_train.npy"
+    multi_filename = "multichan_spikes_train.npy"
+
+    def __init__(
+        self,
+        root: str,
+        transform: Optional[Callable] = None
+    ) -> None:
+
+        super().__init__()
+
+        self.data: Any = []
+
+        # now load the numpy array
+        self.data = np.load(root + self.filename)
+        print(self.data.shape)
+        self.root = root
+        self.transform = transform
+
+    def __getitem__(self, index: int) -> Any :
+        """
+        Args:
+            index (int): Index
+
+        Returns:
+            tensor: wf
+        """
+        wf = self.data[index].astype('float32')
+
+        # doing this so that it is a tensor
+        # wf = torch.from_numpy(wf)
+
+        if self.transform is not None:
+            wf = self.transform(wf)
+
+        return wf
+
+
+    def __len__(self) -> int:
+        return len(self.data)
+
+
+class WF_MultiChan_Dataset(Dataset):
+    filename = "multichan_spikes_train.npy"
 
     def __init__(
         self,
@@ -59,6 +102,7 @@ class WFDataset_lab(Dataset):
     def __init__(
         self,
         root: str,
+        multi_chan: bool = False,
         split: str = 'train',
         transform: Optional[Callable] = None,
         
@@ -66,12 +110,18 @@ class WFDataset_lab(Dataset):
 
         super().__init__()
         if split == 'train':
-            self.filename = "spikes_train.npy"
+            if multi_chan == False:
+                self.filename = "spikes_train.npy"
+            else:
+                self.filename = "multichan_spikes_train.npy"
             self.data = np.load(root + self.filename).astype('float32')
             self.targets = np.array([[i for j in range(1200)] \
                                 for i in range(10)]).reshape(-1).astype('long')
         elif split == 'test':
-            self.filename = "spikes_test.npy"
+            if multi_chan == False:
+                self.filename = "spikes_test.npy"
+            else:
+                self.filename = "multichan_spikes_test.npy"
             self.data = np.load(root + self.filename).astype('float32')
             self.targets = np.array([[i for j in range(300)] \
                                 for i in range(10)]).reshape(-1).astype('long')
@@ -106,9 +156,10 @@ class WFDataset_lab(Dataset):
         return len(self.data)
 
 class ContrastiveLearningDataset:
-    def __init__(self, root_folder, lat_dim):
+    def __init__(self, root_folder, lat_dim, multi_chan):
         self.root_folder = root_folder
         self.lat_dim = lat_dim
+        self.multi_chan = multi_chan
     
 
     @staticmethod
@@ -146,9 +197,18 @@ class ContrastiveLearningDataset:
         return data_transforms
 
     def get_dataset(self, name, n_views, noise_scale=1.0):
-        temp_cov_fn = 'temporal_cov_example.npy'
+        temp_cov_fn = 'temporal_cov_example.npy'    
         spatial_cov_fn = 'spatial_cov_example.npy'
+        if self.multi_chan:
+            name = name + '_multichan'
         valid_datasets = {'wfs': lambda: WFDataset(self.root_folder,
+                                                              transform=ContrastiveLearningViewGenerator(
+                                                                  self.get_wf_pipeline_transform(self, temp_cov_fn,
+                                                                  spatial_cov_fn,
+                                                                #   noise_scale), self.get_pca_transform(self),
+                                                                  noise_scale), None,
+                                                                  n_views)),
+                          'wfs_multichan': lambda: WF_MultiChan_Dataset(self.root_folder,
                                                               transform=ContrastiveLearningViewGenerator(
                                                                   self.get_wf_pipeline_transform(self, temp_cov_fn,
                                                                   spatial_cov_fn,

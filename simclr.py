@@ -74,9 +74,13 @@ class SimCLR(object):
         for epoch_counter in range(self.args.epochs):
             print('Epoch {}'.format(epoch_counter))
             for wf in tqdm(train_loader):
+                print(wf.shape)
                 wf = torch.cat(wf, dim=0)
+                print(wf.shape)
                 wf = torch.squeeze(wf)
+                print(wf.shape)
                 wf = torch.unsqueeze(wf, dim=1)
+                print(wf.shape)
 
                 wf = wf.double().to(self.args.device)
                 # wf = wf.float().to(self.args.device)

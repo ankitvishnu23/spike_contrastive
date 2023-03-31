@@ -41,7 +41,9 @@ class AmpJitter(object):
         wf = sample
         
         amp_jit = np.random.uniform(self.lo, self.hi)
-        wf = amp_jit * wf
+
+        for i in range(wf.shape[0]):
+            wf = amp_jit * wf
     
         return wf
 

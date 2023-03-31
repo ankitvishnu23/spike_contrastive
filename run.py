@@ -24,7 +24,7 @@ def main(args):
     tr_dataset = WFDataset_lab(args.data, split='train')
     te_dataset = WFDataset_lab(args.data, split='test')
     
-    dataset = ContrastiveLearningDataset(args.data, args.out_dim)
+    dataset = ContrastiveLearningDataset(args.data, args.out_dim, multi_chan=args.multi_chan)
 
     train_dataset = dataset.get_dataset(args.dataset_name, args.n_views, args.noise_scale)
 
@@ -33,12 +33,12 @@ def main(args):
         num_workers=args.workers, pin_memory=True, drop_last=True)
 
     # define memory and test dataset for knn monitoring
-    memory_dataset = WFDataset_lab(args.data, split='train')
+    memory_dataset = WFDataset_lab(args.data, split='train', multi_chan=args.multi_chan)
     memory_loader = torch.utils.data.DataLoader(
         memory_dataset, batch_size=args.batch_size, shuffle=False,
         num_workers=args.workers, pin_memory=True, drop_last=False)
     
-    test_dataset = WFDataset_lab(args.data, split='test')
+    test_dataset = WFDataset_lab(args.data, split='test', multi_chan=args.multi_chan)
     test_loader = torch.utils.data.DataLoader(
         test_dataset, batch_size=args.batch_size, shuffle=False,
         num_workers=args.workers, pin_memory=True, drop_last=False)
@@ -149,6 +149,7 @@ if __name__ == "__main__":
     parser.add_argument('--add_prefix', default='', type=str)
     parser.add_argument('--no_proj', default='True', action='store_true')
     parser.add_argument('--expand_dim', default=16, action='store_true')
+    parser.add_argument('--multi_chan', default=False, action='store_true')
 
     
     args = parser.parse_args()
