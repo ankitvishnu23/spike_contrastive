@@ -149,7 +149,8 @@ if __name__ == "__main__":
     parser.add_argument('--add_prefix', default='', type=str)
     parser.add_argument('--no_proj', default='True', action='store_true')
     parser.add_argument('--expand_dim', default=16, action='store_true')
-    parser.add_argument('--multi_chan', default=False, action='store_true')
+    parser.add_argument('--multi_chan', default=True, action='store_true')
+    parser.add_argument('--n_channels', default=11, action='store_true')
 
     
     args = parser.parse_args()
