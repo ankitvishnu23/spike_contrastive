@@ -620,16 +620,18 @@ model_dict = { "custom_encoder": Encoder,
                             "denoiser": SingleChanDenoiser,
                             "fc_encoder": FullyConnectedEnc,
                             "attention": AttentionEnc,
-                            "multichan_attention": MultiChanAttentionEnc1,
+                            "attention_multichan": MultiChanAttentionEnc1,
                             # "resnet18": models.resnet18(pretrained=False, num_classes=out_dim),
                             # "resnet50": models.resnet50(pretrained=False, num_classes=out_dim)
                             }
 
 class ModelSimCLR(nn.Module):
 
-    def __init__(self, base_model, out_dim, proj_dim, fc_depth=2, expand_dim=16, ckpt=None, cls_head=None):
+    def __init__(self, base_model, out_dim, proj_dim, fc_depth=2, expand_dim=16, ckpt=None, cls_head=None, multichan=True):
         super(ModelSimCLR, self).__init__()
         
+        base_model += '_multichan' if multichan else ''
+
         if "attention" in base_model:
             self.backbone = model_dict[base_model](out_size=out_dim, proj_dim=proj_dim, fc_depth=fc_depth, expand_dim=expand_dim, cls_head=cls_head)
         else:
