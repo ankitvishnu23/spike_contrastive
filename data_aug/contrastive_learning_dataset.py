@@ -83,6 +83,7 @@ class WF_MultiChan_Dataset(Dataset):
             tensor: wf
         """
         wf = self.data[index].astype('float32')
+        print(wf.shape)
 
         # doing this so that it is a tensor
         # wf = torch.from_numpy(wf)
@@ -148,6 +149,7 @@ class WFDataset_lab(Dataset):
         # wf = torch.from_numpy(wf)
 
         if self.transform is not None:
+            print(wf.shape)
             wf = self.transform(wf)
 
         return wf, y

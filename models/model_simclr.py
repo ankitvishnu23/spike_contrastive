@@ -324,7 +324,7 @@ class MultiChanAttentionEnc1(nn.Module):
         self.pos_encoder = PositionalEncoding(expand_dim, dropout, spike_size)
         encoder_layers = TransformerEncoderLayer(expand_dim, nhead, 512, batch_first=True)
         self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
-        self.encoder_sum = nn.Linear(self.spike_size * expand_dim * n_channels, self.spike_size * expand_dim)
+        self.encoder_sum = nn.Linear(n_channels, 1)
         list_layers = [nn.Linear(self.spike_size * expand_dim * n_channels, 256), nn.ReLU(inplace=True)]
         for _ in range(fc_depth-2):
             list_layers += [nn.Linear(256, 256), nn.ReLU(inplace=True)]
@@ -383,8 +383,10 @@ class MultiChanAttentionEnc1(nn.Module):
             src[:, chan] = curr_chan
         output = src
         # output = self.transformer_encoder(src, src_mask)
-        output = output.view(-1, self.spike_size * self.expand_dim * self.n_channels)
+        output = output.view(-1, self.n_channels, self.spike_size * self.expand_dim)
+        output = torch.transpose(output, 0, 1)
         output = self.encoder_sum(output)
+        output = torch.squeeze(output)
         output = self.fcpart(output)
         return output
 

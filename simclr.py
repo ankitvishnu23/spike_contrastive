@@ -66,7 +66,7 @@ class SimCLR(object):
 
         n_iter = 0
         logging.info(f"Start SimCLR training for {self.args.epochs} epochs.")
-        logging.info(f"Training with gpu: {self.args.disable_cuda}.")
+        logging.info(f"Training with gpu: {not self.args.disable_cuda}.")
 
         # pca_score = knn_pca_score(self.args.out_dim, self.args.data)
         pca_score = 0
