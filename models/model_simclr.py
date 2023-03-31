@@ -219,8 +219,8 @@ class PositionalEncoding(nn.Module):
         if self.num_chans > 1:
             pe = torch.zeros(1, self.num_chans, max_len, d_model)
             for i in range(self.num_chans):
-                pe[1, i, :, 0::2] = torch.sin(position * div_term)
-                pe[1, i, :, 1::2] = torch.cos(position * div_term)
+                pe[0, i, :, 0::2] = torch.sin(position * div_term)
+                pe[0, i, :, 1::2] = torch.cos(position * div_term)
         else:
             pe = torch.zeros(1, max_len, d_model)
             pe[0, :, 0::2] = torch.sin(position * div_term)
