@@ -43,7 +43,7 @@ class AmpJitter(object):
 
         for i in range(n_chans):
             amp_jit = np.random.uniform(self.lo, self.hi)
-            wf[i] = amp_jit * wf[i]
+            wf[:, i] = amp_jit * wf[:, i]
     
         return wf
 
@@ -62,7 +62,7 @@ class GaussianNoise(object):
         
         for i in range(n_chans):
             noise_wf = np.random.normal(0, 1, w)
-            wf[i] = np.add(wf[i], noise_wf)
+            wf[:, i] = np.add(wf[:, i], noise_wf)
 
         return wf
 
@@ -113,7 +113,7 @@ class SmartNoise(object):
             noise_sel = np.random.choice(n_neigh)
             noise_wf = the_noise[:, noise_sel]
             noise_wf = self.noise_scale * noise_wf
-            wf[i] = np.add(wf[i], noise_wf)
+            wf[:, i] = np.add(wf[:, i], noise_wf)
 
         return wf
 
@@ -201,9 +201,9 @@ class Jitter(object):
         w = wf.shape[2]
         
         for i in range(n_chans):
-            print(wf[i].shape)
+            # print(wf[:, i].shape)
             resample = sp.signal.resample(
-                x=wf[i],
+                x=wf[:, i],
                 num=w*self.up_factor,
                 axis=0)
             print(resample.shape)
@@ -226,8 +226,8 @@ class Jitter(object):
             shift = (2* np.random.binomial(1, 0.5)-1) * np.random.uniform(0, self.shift)
             
             idx_selection = np.random.choice(self.up_factor)
-            wf[i] = up_shifted_temp[idx_selection]
-            wf[i] = self.shift_chans(wf[i], shift)
+            wf[:, i] = up_shifted_temp[idx_selection]
+            wf[:, i] = self.shift_chans(wf[:, i], shift)
 
         return wf
 
