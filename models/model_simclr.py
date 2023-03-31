@@ -398,7 +398,8 @@ class MultiChanAttentionEnc1(nn.Module):
         if self.expand_dim != 1:
             src = torch.unsqueeze(src, dim=-1)
         src = self.pos_encoder(src)
-        src = src.view(-1, self.spike_size, self.expand_dim)
+        print(src.shape, flush=True)
+        src = src.reshape(-1, self.spike_size, self.expand_dim)
         output = self.transformer_encoder(src, src_mask)
         output = output.view(-1, self.n_channels, self.spike_size, self.expand_dim)
         # output = torch.transpose(src, 1, 2)
