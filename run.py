@@ -43,7 +43,7 @@ def main(args):
         test_dataset, batch_size=args.batch_size, shuffle=False,
         num_workers=args.workers, pin_memory=True, drop_last=False)
     model = ModelSimCLR(base_model=args.arch, out_dim=args.out_dim, proj_dim=args.proj_dim, \
-        fc_depth=args.fc_depth, expand_dim=args.expand_dim)
+        fc_depth=args.fc_depth, expand_dim=args.expand_dim, multichan=args.multi_chan)
     if not args.no_proj:
         if args.arch == 'custom_encoder':
             proj = Projector(rep_dim=args.out_dim, proj_dim=args.proj_dim)

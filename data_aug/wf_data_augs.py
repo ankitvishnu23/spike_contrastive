@@ -196,17 +196,17 @@ class Jitter(object):
 
     def __call__(self, sample):
         wf = sample
-        print(wf.shape)
+        print(wf.shape, flush=True)
         n_chans = wf.shape[1]
         w = wf.shape[2]
         
         for i in range(n_chans):
-            # print(wf[:, i].shape)
+            print(wf[:, i].shape, flush=True)
             resample = sp.signal.resample(
                 x=wf[:, i],
                 num=w*self.up_factor,
                 axis=0)
-            print(resample.shape)
+            print(resample.shape, flush=True)
             up_temp = resample.T
             
             idx = (np.arange(0, w)[:,None]*self.up_factor + np.arange(self.up_factor))
