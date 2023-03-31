@@ -22,6 +22,7 @@ class SimCLR(object):
         self.optimizer = kwargs['optimizer']
         self.scheduler = kwargs['scheduler']
         self.writer = SummaryWriter('./logs/'+self.args.exp)
+        self.multichan = self.args.multi_chan
         logging.basicConfig(filename=os.path.join(self.writer.log_dir, 'training.log'), level=logging.DEBUG)
         self.criterion = torch.nn.CrossEntropyLoss().to(self.args.device)
 
@@ -75,11 +76,12 @@ class SimCLR(object):
             print('Epoch {}'.format(epoch_counter))
             for wf in tqdm(train_loader):
                 wf = torch.cat(wf, dim=0)
-                print(wf.shape)
+                # print(wf.shape)
                 wf = torch.squeeze(wf)
-                print(wf.shape)
-                wf = torch.unsqueeze(wf, dim=1)
-                print(wf.shape)
+                # print(wf.shape)
+                if not self.multichan:
+                    wf = torch.unsqueeze(wf, dim=1)
+                # print(wf.shape)
 
                 wf = wf.double().to(self.args.device)
                 # wf = wf.float().to(self.args.device)
