@@ -46,6 +46,7 @@ class WFDataset(Dataset):
         # wf = torch.from_numpy(wf)
 
         if self.transform is not None:
+            print(wf.shape)
             wf = self.transform(wf)
 
         return wf
