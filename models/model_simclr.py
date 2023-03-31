@@ -372,16 +372,18 @@ class MultiChanAttentionEnc1(nn.Module):
             output Tensor of shape [batch_size, proj_dim]
         """
         src = torch.transpose(src, 1, 2)
-        print(src.shape)
+        print(src.shape, flush=True)
 
         for chan in range(self.n_channels):
-            curr_chan = src[:, chan]
+            curr_chan = src[:, :, chan]
+            # curr_chan = torch.transpose(curr_chan, 1, 2)
+            print(curr_chan.shape, flush=True)
             if self.expand_dim != 1:
                 curr_chan = self.encoder(curr_chan) * math.sqrt(self.expand_dim)
             curr_chan = self.pos_encoder(curr_chan)
             curr_chan = self.transformer_encoder(curr_chan, src_mask)
-            src[:, chan] = curr_chan
-        output = src
+            # src[:, chan] = torch.transpose(curr_chan, 1, 2)
+            src[:, :, chan] = curr_chan
         # output = self.transformer_encoder(src, src_mask)
         output = output.view(-1, self.n_channels, self.spike_size * self.expand_dim)
         output = torch.transpose(output, 0, 1)
