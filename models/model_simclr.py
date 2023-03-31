@@ -371,20 +371,25 @@ class MultiChanAttentionEnc1(nn.Module):
         Returns:
             output Tensor of shape [batch_size, proj_dim]
         """
-        src = torch.transpose(src, 1, 2)
+        # src = torch.transpose(src, 1, 2)
 
-        for chan in range(self.n_channels):
-            curr_chan = src[:, :, chan]
-            curr_chan = torch.unsqueeze(curr_chan, dim=2)
-            # curr_chan = torch.transpose(curr_chan, 1, 2)
-            if self.expand_dim != 1:
-                curr_chan = self.encoder(curr_chan) * math.sqrt(self.expand_dim)
-            curr_chan = self.pos_encoder(curr_chan)
-            curr_chan = self.transformer_encoder(curr_chan, src_mask)
-            # src[:, chan] = torch.transpose(curr_chan, 1, 2)
-            src[:, :, chan] = curr_chan
-        # output = self.transformer_encoder(src, src_mask)
-        output = torch.transpose(src, 1, 2)
+        # for chan in range(self.n_channels):
+        #     curr_chan = src[:, :, chan]
+        #     curr_chan = torch.unsqueeze(curr_chan, dim=2)
+        #     # curr_chan = torch.transpose(curr_chan, 1, 2)
+        #     if self.expand_dim != 1:
+        #         curr_chan = self.encoder(curr_chan) * math.sqrt(self.expand_dim)
+        #     curr_chan = self.pos_encoder(curr_chan)
+        #     curr_chan = self.transformer_encoder(curr_chan, src_mask)
+        #     # src[:, chan] = torch.transpose(curr_chan, 1, 2)
+        #     src[:, :, chan] = curr_chan
+        if self.expand_dim != 1:
+            src = torch.unsqueeze(src, dim=-1)
+        src = self.pos_encoder(src)
+        src = src.view(-1, self.spike_size, self.expand_dim)
+        output = self.transformer_encoder(src, src_mask)
+        output = output.view(-1, self.n_channels, self.spike_size, self.expand_dim)
+        # output = torch.transpose(src, 1, 2)
         output = output.view(-1, self.n_channels, self.spike_size * self.expand_dim)
         output = torch.transpose(output, 0, 1)
         output = self.encoder_sum(output)
