@@ -333,7 +333,7 @@ class MultiChanAttentionEnc1(nn.Module):
             self.encoder = nn.Linear(1, expand_dim)
         else:
             nhead = 1
-        self.pos_encoder = PositionalEncoding(expand_dim, dropout, spike_size, True)
+        self.pos_encoder = PositionalEncoding(expand_dim, dropout, spike_size, num_chans=n_channels)
         encoder_layers = TransformerEncoderLayer(expand_dim, nhead, 512, batch_first=True)
         self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
         self.encoder_sum = nn.Linear(n_channels, 1)
