@@ -8,7 +8,57 @@ from simclr import SimCLR
 import numpy as np
 import os 
 import sys
+from tqdm import tqdm
+from torch.utils.tensorboard import SummaryWriter
+from utils import save_checkpoint, AverageMeter, accuracy 
 
+def validate(model, test_loader, writer, epoch, args, best_acc):
+
+    # evaluate
+    model.eval()
+    top1 = AverageMeter('Acc@1')
+    top5 = AverageMeter('Acc@5')
+
+    num_classes = 10
+
+    correct_per_class = torch.zeros(num_classes, device='cuda')
+    total_per_class = torch.zeros(num_classes, device='cuda')
+
+    print(total_per_class.shape)
+    print(len(test_loader.dataset))
+    # only in ensemble freeze eval mode or single model freeze eval mode, calculate ECE
+   
+    with torch.no_grad():
+        for wf, target in tqdm(test_loader):
+            target = target.cuda(non_blocking=True)
+            output = model(wf.unsqueeze(dim=1).cuda(non_blocking=True))
+            acc1, acc5 = accuracy(output, target, topk=(1, 5))
+            top5.update(acc5[0].item(), wf.size(0))
+            top1.update(acc1[0].item(), wf.size(0))
+
+            # per class accuracy
+            _, preds = output.max(1)
+            correct_vec = (preds == target) # if each prediction is correct or not
+            ind_per_class = (target.unsqueeze(1) == torch.arange(num_classes, device='cuda')) # indicator variable for each class
+            correct_per_class += (correct_vec.unsqueeze(1) * ind_per_class).sum(0)
+            total_per_class += ind_per_class.sum(0)
+
+    # sanity check that the sum of total per class amounts to the whole dataset
+    assert total_per_class.sum() == len(test_loader.dataset)
+    acc_per_class = correct_per_class / total_per_class
+
+    is_best = False
+    if best_acc.top1 < top1.avg:
+        best_acc.top1 = top1.avg
+        best_acc.top5 = top5.avg
+        is_best = True
+        torch.save(acc_per_class.cpu(), os.path.join('./ft_runs', args.exp + 'best_acc_per_class.pth'))
+        
+
+    writer.add_scalar('Test Acc1', top1.avg, epoch)
+    writer.add_scalar('Test Acc5', top5.avg, epoch)
+
+    return acc_per_class, is_best
 
 def main(args):
     assert args.n_views == 2, "Only two view training is supported. Please use --n-views 2."
@@ -24,26 +74,41 @@ def main(args):
     tr_dataset = WFDataset_lab(args.data, split='train')
     te_dataset = WFDataset_lab(args.data, split='test')
     
-    dataset = ContrastiveLearningDataset(args.data, args.out_dim, multi_chan=args.multi_chan)
+    dataset = ContrastiveLearningDataset(args.data, args.out_dim)
 
     train_dataset = dataset.get_dataset(args.dataset_name, args.n_views, args.noise_scale)
-
-    train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=args.batch_size, shuffle=True,
-        num_workers=args.workers, pin_memory=True, drop_last=True)
+    if args.finetune:
+        train_loader = torch.utils.data.DataLoader(
+            tr_dataset, batch_size=args.batch_size, shuffle=True,
+            num_workers=args.workers, pin_memory=True, drop_last=True)
+    else:
+        train_loader = torch.utils.data.DataLoader(
+            train_dataset, batch_size=args.batch_size, shuffle=True,
+            num_workers=args.workers, pin_memory=True, drop_last=True)
+        
 
     # define memory and test dataset for knn monitoring
-    memory_dataset = WFDataset_lab(args.data, split='train', multi_chan=args.multi_chan)
+    memory_dataset = WFDataset_lab(args.data, split='train')
     memory_loader = torch.utils.data.DataLoader(
         memory_dataset, batch_size=args.batch_size, shuffle=False,
         num_workers=args.workers, pin_memory=True, drop_last=False)
     
-    test_dataset = WFDataset_lab(args.data, split='test', multi_chan=args.multi_chan)
+    test_dataset = WFDataset_lab(args.data, split='test')
     test_loader = torch.utils.data.DataLoader(
         test_dataset, batch_size=args.batch_size, shuffle=False,
         num_workers=args.workers, pin_memory=True, drop_last=False)
-    model = ModelSimCLR(base_model=args.arch, out_dim=args.out_dim, proj_dim=args.proj_dim, \
-        fc_depth=args.fc_depth, expand_dim=args.expand_dim, multichan=args.multi_chan)
+    if args.finetune:
+        model = ModelSimCLR(base_model=args.arch, out_dim=args.out_dim, proj_dim=args.proj_dim, \
+            fc_depth=args.fc_depth, expand_dim=args.expand_dim, cls_head=args.cls_head)
+        ckpt = torch.load('runs/'+args.pt_ckpt+'_checkpoint_0500.pth.tar', map_location="cpu")
+        k1, k2 = model.load_state_dict(ckpt['state_dict'], strict=False)
+        print(k1, k2)
+        
+        
+    else:
+        model = ModelSimCLR(base_model=args.arch, out_dim=args.out_dim, proj_dim=args.proj_dim, \
+        fc_depth=args.fc_depth, expand_dim=args.expand_dim)
+
     if not args.no_proj:
         if args.arch == 'custom_encoder':
             proj = Projector(rep_dim=args.out_dim, proj_dim=args.proj_dim)
@@ -62,9 +127,51 @@ def main(args):
                                                            last_epoch=-1)
 
     #  It’s a no-op if the 'gpu_index' argument is a negative integer or None.
-    with torch.cuda.device(args.gpu_index):
-        simclr = SimCLR(model=model, proj=proj, optimizer=optimizer, scheduler=scheduler, args=args)
-        simclr.train(train_loader, memory_loader, test_loader)
+    if args.finetune:
+        os.makedirs('./ft_logs/', exist_ok=True)
+        os.makedirs('./ft_runs/', exist_ok=True)
+        
+        writer = SummaryWriter('./ft_logs/'+args.exp)
+        model.cuda()
+        criterion = torch.nn.CrossEntropyLoss().cuda()
+        best_acc = argparse.Namespace(top1=0, top5=0)
+        
+        for ep in range(args.epochs):
+            print('Epoch {}'.format(ep))
+            model.train()
+            total_loss = 0.0
+            for i, (wf, target) in enumerate(train_loader):
+                wf, target = wf.cuda(non_blocking=True),  target.cuda(non_blocking=True)
+                optimizer.zero_grad()
+                output = model(wf.unsqueeze(dim=1))
+                loss = criterion(output, target)
+                loss.backward()
+                optimizer.step()
+                if scheduler is not None:
+                    scheduler.step()
+                total_loss += loss.item()
+            print(f'Loss at epoch {ep}: {total_loss/i}')
+            writer.add_scalar('loss', total_loss/i, ep)
+            curr_lr = optimizer.param_groups[0]['lr'] if scheduler == None else scheduler.get_lr()[0]
+            writer.add_scalar('learning_rate', curr_lr, ep)
+
+            # eval loop
+            acc_per_class, is_best = validate(model, test_loader, writer, ep, args, best_acc)
+            
+        torch.save(acc_per_class.cpu(), os.path.join('./ft_runs', args.exp + 'last_acc_per_class.pth'))
+
+        checkpoint_name = args.exp + 'latest.pth.tar'
+        save_checkpoint({
+            'epoch': args.epochs,
+            'arch': args.arch,
+            'state_dict': model.state_dict(),
+            'optimizer': optimizer.state_dict(),
+        }, is_best=False, filename=os.path.join('./ft_runs', checkpoint_name))
+            
+    else:
+        with torch.cuda.device(args.gpu_index):
+            simclr = SimCLR(model=model, proj=proj, optimizer=optimizer, scheduler=scheduler, args=args)
+            simclr.train(train_loader, memory_loader, test_loader)
 
 def make_sh_and_submit(args):
     os.makedirs('./scripts/', exist_ok=True)
@@ -84,6 +191,12 @@ def make_sh_and_submit(args):
     with open(f'./scripts/{name}.sh', 'w') as file:
         file.write(preamble)
         file.write("echo \"current time: $(date)\";\n")
+        # if args.finetune:
+        #     file.write(
+        #     f'python {sys.argv[0]} '
+        #     f'{options} '
+        #     )
+        # else:
         file.write(
             f'python {sys.argv[0]} '
             f'{options} --exp={name} '
@@ -107,15 +220,15 @@ if __name__ == "__main__":
                         help='dataset name', choices=['wfs', 'stl10', 'cifar10'])
     parser.add_argument('--optimizer', default='adam', choices = ['adam', 'sgd'],
                         help='optimizer')
-    parser.add_argument('-a', '--arch', metavar='ARCH', default='custom_encoder',
+    parser.add_argument('-a', '--arch', metavar='ARCH', default='attention',
                         help='default: custom_encoder)')
     parser.add_argument('-ns', '--noise_scale', default=1.0,
                         help='how much to scale the noise augmentation (default: 1)')
     parser.add_argument('-j', '--workers', default=12, type=int, metavar='N',
                         help='number of data loading workers (default: 32)')
-    parser.add_argument('--epochs', default=300, type=int, metavar='N',
+    parser.add_argument('--epochs', default=100, type=int, metavar='N',
                         help='number of total epochs to run')
-    parser.add_argument('-b', '--batch-size', default=1024, type=int,
+    parser.add_argument('-b', '--batch-size', default=256, type=int,
                         metavar='N',
                         help='mini-batch size (default: 256), this is the total '
                             'batch size of all GPUs on the current node when '
@@ -149,8 +262,9 @@ if __name__ == "__main__":
     parser.add_argument('--add_prefix', default='', type=str)
     parser.add_argument('--no_proj', default='True', action='store_true')
     parser.add_argument('--expand_dim', default=16, action='store_true')
-    parser.add_argument('--multi_chan', default=True, action='store_true')
-    parser.add_argument('--n_channels', default=11, action='store_true')
+    parser.add_argument('--finetune', default=True, action='store_true')
+    parser.add_argument('--pt_ckpt', default='', type=str)
+    parser.add_argument('--cls_head', default=None, type=str, choices=('linear', 'mlp2', 'mlp3'))
 
     
     args = parser.parse_args()

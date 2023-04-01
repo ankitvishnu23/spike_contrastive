@@ -39,9 +39,11 @@ class AmpJitter(object):
 
     def __call__(self, sample):
         wf = sample
-        
-        amp_jit = np.random.uniform(self.lo, self.hi)
-        wf = amp_jit * wf
+        n_chans = wf.shape[0]
+
+        for i in range(n_chans):
+            amp_jit = np.random.uniform(self.lo, self.hi)
+            wf[i] = amp_jit * wf[i]
     
         return wf
 
@@ -55,10 +57,12 @@ class GaussianNoise(object):
     """
     def __call__(self, sample):
         wf = sample
-        w = wf.shape[0]
+        n_chans = wf.shape[0]
+        w = wf.shape[1]
         
-        noise_wf = np.random.normal(0, 1, w)
-        wf = np.add(wf, noise_wf)
+        for i in range(n_chans):
+            noise_wf = np.random.normal(0, 1, w)
+            wf[i] = np.add(wf[i], noise_wf)
 
         return wf
 
@@ -83,30 +87,33 @@ class SmartNoise(object):
             spatial_cov = np.load(os.path.join(self.root_folder + self.spatial_name))
         self.temporal_cov = temporal_cov
         self.spatial_cov = spatial_cov
-        self.noise_scale = np.float64(noise_scale)
+        # self.noise_scale = np.float64(noise_scale)
+        self.noise_scale = np.float32(noise_scale)
+        
 
     def __call__(self, sample):
         wf = sample
-        w = wf.shape[0]
+        n_chans = wf.shape[0]
+        w = wf.shape[1]
 
         assert self.temporal_cov.shape[0] == w
 
         n_neigh, _ = self.spatial_cov.shape
         waveform_length, _ = self.temporal_cov.shape
 
-        noise = np.random.normal(size=(waveform_length, n_neigh))
+        for i in range(n_chans):
+            noise = np.random.normal(size=(waveform_length, n_neigh))
 
-        for c in range(n_neigh):
-            noise[:, c] = np.matmul(noise[:, c], self.temporal_cov)
+            noise = np.matmul(noise.T, self.temporal_cov).T
             reshaped_noise = np.reshape(noise, (-1, n_neigh))
 
-        the_noise = np.reshape(np.matmul(reshaped_noise, self.spatial_cov),
-                           (waveform_length, n_neigh))
+            the_noise = np.reshape(np.matmul(reshaped_noise, self.spatial_cov),
+                            (waveform_length, n_neigh))
 
-        noise_sel = np.random.choice(n_neigh)
-        noise_wf = the_noise[:, noise_sel]
-        noise_wf = self.noise_scale * noise_wf
-        wf = np.add(wf, noise_wf)
+            noise_sel = np.random.choice(n_neigh)
+            noise_wf = the_noise[:, noise_sel]
+            noise_wf = self.noise_scale * noise_wf
+            wf[i] = np.add(wf[i], noise_wf)
 
         return wf
 
@@ -121,9 +128,11 @@ class Collide(object):
     root_folder = '/home/jovyan/nyu47-templates/'
     temp_name = 'spikes_train.npy'
 
-    def __init__(self, root_folder=None, templates=None):
+    def __init__(self, root_folder=None, templates=None, multichan=False):
         if root_folder is not None:
             self.root_folder = root_folder
+        if multichan:
+            temp_name = 'multichan_' + temp_name
         if templates is None:
             templates = np.load(os.path.join(self.root_folder, self.temp_name))
         # assert isinstance(templates, (array, array))
@@ -131,7 +140,8 @@ class Collide(object):
 
     def __call__(self, sample):
         wf = sample
-        w = wf.shape[0]
+        n_chans = wf.shape[0]
+        w = wf.shape[1]
 
         temp_idx = np.random.randint(0, len(self.templates))
         temp_sel = self.templates[temp_idx]
@@ -140,9 +150,10 @@ class Collide(object):
         shift = (2* np.random.binomial(1, 0.5)-1) * np.random.randint(5, 60)
 
         temp_sel = temp_sel * scale
-        temp_sel = self.shift_chans(temp_sel, shift)
+        for i in range(n_chans):
+            temp_sel[i] = self.shift_chans(temp_sel[i], shift)
 
-        wf = wf + temp_sel
+        wf = np.add(wf, temp_sel)
 
         return wf
 
@@ -185,33 +196,35 @@ class Jitter(object):
 
     def __call__(self, sample):
         wf = sample
-        w = wf.shape[0]
+        n_chans = wf.shape[0]
+        w = wf.shape[1]
         
-        resample = sp.signal.resample(
-            x=wf,
-            num=w*self.up_factor,
-            axis=0)
-        up_temp = resample.T
-        
-        idx = (np.arange(0, w)[:,None]*self.up_factor + np.arange(self.up_factor))
-        up_shifted_temp = up_temp[idx].T
+        for i in range(n_chans):
+            resample = sp.signal.resample(
+                x=wf[i],
+                num=w*self.up_factor,
+                axis=0)
+            up_temp = resample.T
+            
+            idx = (np.arange(0, w)[:,None]*self.up_factor + np.arange(self.up_factor))
+            up_shifted_temp = up_temp[idx].T
 
-        # temp_idx = np.random.choice(0, len(self.templates))
-        # temp_sel = self.templates[temp_idx]
+            # temp_idx = np.random.choice(0, len(self.templates))
+            # temp_sel = self.templates[temp_idx]
 
-        # idx = np.arange(0, self.up_factor*w).reshape(-1, self.up_factor)
-        # up_shifted_wfs = wf_upsamp[idx]
-        # up_shifted_temps.unsqueeze(1)
-        # up_shifted_temps = torch.cat(
-        #     (up_shifted_temps,temp_sel),
-        #     axis=1)
-        
+            # idx = np.arange(0, self.up_factor*w).reshape(-1, self.up_factor)
+            # up_shifted_wfs = wf_upsamp[idx]
+            # up_shifted_temps.unsqueeze(1)
+            # up_shifted_temps = torch.cat(
+            #     (up_shifted_temps,temp_sel),
+            #     axis=1)
+            
 
-        shift = (2* np.random.binomial(1, 0.5)-1) * np.random.uniform(0, self.shift)
-        
-        idx_selection = np.random.choice(self.up_factor)
-        wf = up_shifted_temp[idx_selection]
-        wf = self.shift_chans(wf, shift)
+            shift = (2* np.random.binomial(1, 0.5)-1) * np.random.uniform(0, self.shift)
+            
+            idx_selection = np.random.choice(self.up_factor)
+            wf[i] = up_shifted_temp[idx_selection]
+            wf[i] = self.shift_chans(wf[i], shift)
 
         return wf
 
@@ -246,7 +259,7 @@ class PCA_Reproj(object):
     root_folder = '/datastores/dy016'
     spikes_file = 'spikes_train.npy'
 
-    def __init__(self, root_folder=None, spikes_file=None, pca_dim=10):
+    def __init__(self, root_folder=None, spikes_file=None, pca_dim=5):
         assert isinstance(pca_dim, (int))
         if root_folder is not None:
             self.root_folder = root_folder
@@ -259,7 +272,7 @@ class PCA_Reproj(object):
 
     def __call__(self, sample):
         transform = self.pca_.transform(sample.reshape(1, -1))
-        recon = self.pca_.inverse_transform(transform)[0] + self.spikes_mean
+        recon = self.pca_.inverse_transform(transform)[0]
 
         return recon
 
