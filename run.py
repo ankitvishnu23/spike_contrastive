@@ -1,25 +1,49 @@
 import argparse
+import numpy as np
+import os 
+import sys
+import subprocess
+
 import torch
 import torch.backends.cudnn as cudnn
+
 from torchvision import models
 from data_aug.contrastive_learning_dataset import ContrastiveLearningDataset, WFDataset_lab
 from models.model_simclr import ModelSimCLR, Projector, Projector2
 from simclr import SimCLR
-import numpy as np
-import os 
-import sys
 
 
 def main(args):
     assert args.n_views == 2, "Only two view training is supported. Please use --n-views 2."
     # check if gpu training is available
-    if not args.disable_cuda and torch.cuda.is_available():
+    args.ngpus_per_node = torch.cuda.device_count()
+    if 'SLURM_JOB_ID' in os.environ:
+        cmd = 'scontrol show hostnames ' + os.getenv('SLURM_JOB_NODELIST')
+        stdout = subprocess.check_output(cmd.split())
+        # host_name = stdout.decode().splitlines()[0]
+        args.rank = int(os.getenv('SLURM_NODEID')) * args.ngpus_per_node
+        args.world_size = int(os.getenv('SLURM_NNODES')) * args.ngpus_per_node
+    elif not args.disable_cuda and args.multi_chan:
+        # single-node distributed training
+        args.rank = 0
+        args.world_size = args.ngpus_per_node
+    elif not args.disable_cuda and torch.cuda.is_available():
         args.device = torch.device('cuda')
         cudnn.deterministic = True
         cudnn.benchmark = True
     else:
         args.device = torch.device('cpu')
         args.gpu_index = -1
+    torch.multiprocessing.spawn(main_worker, (args,), args.ngpus_per_node)
+
+def main_worker(gpu, args):
+    args.rank += gpu
+    
+    torch.distributed.init_process_group(
+        backend='nccl', world_size=args.world_size, rank=args.rank)
+    
+    torch.cuda.set_device(gpu)
+    torch.backends.cudnn.benchmark = True
 
     tr_dataset = WFDataset_lab(args.data, split='train')
     te_dataset = WFDataset_lab(args.data, split='test')
@@ -27,10 +51,13 @@ def main(args):
     dataset = ContrastiveLearningDataset(args.data, args.out_dim, multi_chan=args.multi_chan)
 
     train_dataset = dataset.get_dataset(args.dataset_name, args.n_views, args.noise_scale)
+    sampler = torch.utils.data.distributed.DistributedSampler(dataset, drop_last=True)
+    assert args.batch_size % args.world_size == 0
+    per_device_batch_size = args.batch_size // args.world_size
 
     train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=args.batch_size, shuffle=True,
-        num_workers=args.workers, pin_memory=True, drop_last=True)
+        train_dataset, batch_size=per_device_batch_size, shuffle=True,
+        num_workers=args.workers, pin_memory=True, sampler=sampler)
 
     # define memory and test dataset for knn monitoring
     memory_dataset = WFDataset_lab(args.data, split='train', multi_chan=args.multi_chan)
@@ -42,8 +69,10 @@ def main(args):
     test_loader = torch.utils.data.DataLoader(
         test_dataset, batch_size=args.batch_size, shuffle=False,
         num_workers=args.workers, pin_memory=True, drop_last=False)
+    
     model = ModelSimCLR(base_model=args.arch, out_dim=args.out_dim, proj_dim=args.proj_dim, \
         fc_depth=args.fc_depth, expand_dim=args.expand_dim, multichan=args.multi_chan)
+
     if not args.no_proj:
         if args.arch == 'custom_encoder':
             proj = Projector(rep_dim=args.out_dim, proj_dim=args.proj_dim)
@@ -115,7 +144,7 @@ if __name__ == "__main__":
                         help='number of data loading workers (default: 32)')
     parser.add_argument('--epochs', default=300, type=int, metavar='N',
                         help='number of total epochs to run')
-    parser.add_argument('-b', '--batch-size', default=1024, type=int,
+    parser.add_argument('-b', '--batch_size', default=1024, type=int,
                         metavar='N',
                         help='mini-batch size (default: 256), this is the total '
                             'batch size of all GPUs on the current node when '

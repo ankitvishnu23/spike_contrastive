@@ -4,6 +4,10 @@ import sys
 
 import torch
 import torch.nn.functional as F
+import torch.multiprocessing as mp
+import torch.distributed as dist
+
+from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.cuda.amp import GradScaler, autocast
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
@@ -17,6 +21,8 @@ class SimCLR(object):
     def __init__(self, *args, **kwargs):
         self.args = kwargs['args']
         self.model = kwargs['model'].double().to(self.args.device)
+        self.model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(self.model)
+        self.model = DDP(self.model, device_ids=[self.args.device])
         # self.model = kwargs['model'].to(self.args.device)
         self.proj = kwargs['proj'].to(self.args.device) if kwargs['proj'] is not None else None
         self.optimizer = kwargs['optimizer']
