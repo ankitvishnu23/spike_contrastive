@@ -3,6 +3,7 @@ import numpy as np
 import os 
 import sys
 import subprocess
+import random
 
 import torch
 import torch.backends.cudnn as cudnn
@@ -17,30 +18,34 @@ def main(args):
     assert args.n_views == 2, "Only two view training is supported. Please use --n-views 2."
     # check if gpu training is available
     args.ngpus_per_node = torch.cuda.device_count()
+    assert args.ngpus_per_node > 0, "Only GPU training is currently supported. Please run with at least 1 GPU."
     if 'SLURM_JOB_ID' in os.environ:
         cmd = 'scontrol show hostnames ' + os.getenv('SLURM_JOB_NODELIST')
         stdout = subprocess.check_output(cmd.split())
-        # host_name = stdout.decode().splitlines()[0]
+        host_name = stdout.decode().splitlines()[0]
         args.rank = int(os.getenv('SLURM_NODEID')) * args.ngpus_per_node
         args.world_size = int(os.getenv('SLURM_NNODES')) * args.ngpus_per_node
+        args.dist_url = f'tcp://{host_name}:58478'
     elif not args.disable_cuda and args.multi_chan:
         # single-node distributed training
         args.rank = 0
         args.world_size = args.ngpus_per_node
-    elif not args.disable_cuda and torch.cuda.is_available():
-        args.device = torch.device('cuda')
+        args.dist_url = f'tcp://localhost:{random.randrange(49152, 65535)}'
+    # elif not args.disable_cuda and torch.cuda.is_available():
+        # args.device = torch.device('cuda')
         cudnn.deterministic = True
         cudnn.benchmark = True
-    else:
-        args.device = torch.device('cpu')
-        args.gpu_index = -1
+    # else:
+    #     args.device = torch.device('cpu')
+    #     args.gpu_index = -1
     torch.multiprocessing.spawn(main_worker, (args,), args.ngpus_per_node)
 
 def main_worker(gpu, args):
     args.rank += gpu
     
     torch.distributed.init_process_group(
-        backend='nccl', world_size=args.world_size, rank=args.rank)
+        backend='nccl', init_method=args.dist_url,
+        world_size=args.world_size, rank=args.rank)
     
     torch.cuda.set_device(gpu)
     torch.backends.cudnn.benchmark = True
@@ -91,9 +96,9 @@ def main_worker(gpu, args):
                                                            last_epoch=-1)
 
     #  It’s a no-op if the 'gpu_index' argument is a negative integer or None.
-    with torch.cuda.device(args.gpu_index):
-        simclr = SimCLR(model=model, proj=proj, optimizer=optimizer, scheduler=scheduler, args=args)
-        simclr.train(train_loader, memory_loader, test_loader)
+    # with torch.cuda.device(args.gpu_index):
+    simclr = SimCLR(model=model, proj=proj, optimizer=optimizer, scheduler=scheduler, gpu=gpu, args=args)
+    simclr.train(train_loader, memory_loader, test_loader)
 
 def make_sh_and_submit(args):
     os.makedirs('./scripts/', exist_ok=True)

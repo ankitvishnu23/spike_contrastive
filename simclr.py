@@ -20,7 +20,8 @@ class SimCLR(object):
 
     def __init__(self, *args, **kwargs):
         self.args = kwargs['args']
-        self.model = kwargs['model'].double().to(self.args.device)
+        # self.model = kwargs['model'].double().cuda(self.args.device)
+        self.model = kwargs['model'].double().cuda(kwargs['gpu'])
         self.model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(self.model)
         self.model = DDP(self.model, device_ids=[self.args.device])
         # self.model = kwargs['model'].to(self.args.device)
