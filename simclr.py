@@ -24,7 +24,7 @@ class SimCLR(object):
         # self.model = kwargs['model'].double().cuda(self.args.device)
         self.model = kwargs['model'].double().cuda(self.gpu)
         self.model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(self.model)
-        self.model = DDP(self.model, device_ids=[self.gpu])
+        self.model = DDP(self.model, device_ids=[self.gpu], find_unused_parameters=True)
         # self.model = kwargs['model'].cuda(self.args.device)
         self.proj = kwargs['proj'].cuda(kwargs['gpu']) if kwargs['proj'] is not None else None
         self.optimizer = kwargs['optimizer']
