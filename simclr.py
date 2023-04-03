@@ -41,6 +41,7 @@ class SimCLR(object):
         if self.args.rank == 0 or not self.args.ddp:
             logging.basicConfig(filename=os.path.join(self.writer.log_dir, 'training.log'), level=logging.DEBUG)
         self.criterion = torch.nn.CrossEntropyLoss().cuda(self.gpu)
+        self.start_epoch = kwargs['start_epoch']
 
     def info_nce_loss(self, features):
 
@@ -90,7 +91,7 @@ class SimCLR(object):
         # pca_score = knn_pca_score(self.args.out_dim, self.args.data)
         pca_score = 0
 
-        for epoch_counter in range(self.args.epochs):
+        for epoch_counter in range(self.start_epoch, self.args.epochs):
             print('Epoch {}'.format(epoch_counter))
             for wf in tqdm(train_loader):
                 wf = torch.cat(wf, dim=0)
@@ -140,12 +141,12 @@ class SimCLR(object):
         if self.args.rank == 0 or not self.args.ddp:
             logging.info("Training has finished.")
             # save model checkpoints
-            checkpoint_name = self.args.exp + '_checkpoint_{:04d}.pth.tar'.format(self.args.epochs)
+            # checkpoint_name = self.args.exp + '_checkpoint_{:04d}.pth.tar'.format(self.args.epochs)
             save_checkpoint({
                 'epoch': self.args.epochs,
                 'arch': self.args.arch,
                 'state_dict': self.model.state_dict(),
                 'optimizer': self.optimizer.state_dict(),
-            }, is_best=False, filename=os.path.join(self.args.checkpoint_dir, checkpoint_name))
+            }, is_best=False, filename=os.path.join(self.args.checkpoint_dir, 'checkpoint.pth'))
             # }, is_best=False, filename=os.path.join('./runs', checkpoint_name))
-            logging.info(f"Model checkpoint and metadata has been saved at {'./runs'}.")
+            logging.info(f"Model checkpoint and metadata has been saved at {self.args.checkpoint_dir}.")

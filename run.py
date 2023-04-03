@@ -108,9 +108,20 @@ def main_worker(gpu, args):
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=(args.epochs * len(train_loader)), eta_min=0,
                                                            last_epoch=-1)
 
+        # automatically resume from checkpoint if it exists
+    if os.path.join(self.args.checkpoint_dir, "checkpoint.pth").is_file():
+        ckpt = torch.load(os.path.join(self.args.checkpoint_dir, "checkpoint.pth"),
+                          map_location='cpu')
+        start_epoch = ckpt['epoch']
+        model.load_state_dict(ckpt['state_dict'])
+        optimizer.load_state_dict(ckpt['optimizer'])
+
+    else:
+        start_epoch = 0
+        
     #  It’s a no-op if the 'gpu_index' argument is a negative integer or None.
     # with torch.cuda.device(args.gpu_index):
-    simclr = SimCLR(model=model, proj=proj, optimizer=optimizer, scheduler=scheduler, gpu=gpu, args=args)
+    simclr = SimCLR(model=model, proj=proj, optimizer=optimizer, scheduler=scheduler, gpu=gpu, args=args, start_epoch=start_epoch)
     simclr.train(train_loader, memory_loader, test_loader)
 
 def make_sh_and_submit(args):
