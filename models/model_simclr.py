@@ -6,7 +6,7 @@ from torch.nn import TransformerEncoder, TransformerEncoderLayer
 
 from exceptions.exceptions import InvalidBackboneError
 from collections import OrderedDict
-
+import sys
 
 class SingleChanDenoiser(nn.Module):
     """Cleaned up a little. Why is conv3 here and commented out in forward?"""
@@ -302,10 +302,13 @@ class AttentionEnc(nn.Module):
         src = torch.transpose(src, 1, 2)
         if self.expand_dim != 1:
             src = self.encoder(src) * math.sqrt(self.expand_dim)
+            
         src = self.pos_encoder(src)
+        
         output = self.transformer_encoder(src, src_mask)
         output = output.view(-1, self.spike_size * self.expand_dim)
         output = self.fcpart(output)
+        
         return output
 
     def load(self, fname_model):
@@ -334,7 +337,9 @@ class MultiChanAttentionEnc1(nn.Module):
         else:
             nhead = 1
         self.pos_encoder = PositionalEncoding(expand_dim, dropout, spike_size, num_chans=n_channels)
-        encoder_layers = TransformerEncoderLayer(expand_dim, nhead, 512, batch_first=True)
+        # encoder_layers = TransformerEncoderLayer(expand_dim, nhead, 512, batch_first=True)
+        encoder_layers = TransformerEncoderLayer(expand_dim, nhead, 512)
+        
         self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
         self.encoder_sum = nn.Linear(n_channels, 1)
         list_layers = [nn.Linear(self.spike_size * self.expand_dim, 256), nn.ReLU(inplace=True)]
@@ -395,17 +400,22 @@ class MultiChanAttentionEnc1(nn.Module):
         #     curr_chan = self.transformer_encoder(curr_chan, src_mask)
         #     # src[:, chan] = torch.transpose(curr_chan, 1, 2)
         #     src[:, :, chan] = curr_chan
+        
         if self.expand_dim != 1:
             src = torch.unsqueeze(src, dim=-1)
-        src = self.pos_encoder(src)
-        src = src.reshape(-1, self.spike_size, self.expand_dim)
+        src = self.pos_encoder(src)  # [B, n_chans, seq_len, embed_dim]
+        src = src.reshape(-1, self.spike_size, self.expand_dim) # [B * n_chans, seq_len, embed_dim]
+        src = src.permute(1, 0, 2) # remove batch_first argument needs Batch in second dim
+        
         output = self.transformer_encoder(src, src_mask)
         # output = output.view(-1, self.n_channels, self.spike_size, self.expand_dim)
         # output = torch.transpose(src, 1, 2)
-        output = output.view(-1, self.n_channels, self.spike_size * self.expand_dim)
+        output = output.permute(1, 0, 2)
+        output = output.reshape(-1, self.n_channels, self.spike_size * self.expand_dim)
         output = torch.transpose(output, 1, 2)
         output = self.encoder_sum(output)
         output = torch.squeeze(output)
+        
         output = self.fcpart(output)
         return output
 

@@ -14,38 +14,44 @@ from models.model_simclr import ModelSimCLR, Projector, Projector2
 from simclr import SimCLR
 
 
-def main(args):
-    assert args.n_views == 2, "Only two view training is supported. Please use --n-views 2."
-    # check if gpu training is available
-    args.ngpus_per_node = torch.cuda.device_count()
-    assert args.ngpus_per_node > 0, "Only GPU training is currently supported. Please run with at least 1 GPU."
-    if 'SLURM_JOB_ID' in os.environ:
-        cmd = 'scontrol show hostnames ' + os.getenv('SLURM_JOB_NODELIST')
-        stdout = subprocess.check_output(cmd.split())
-        host_name = stdout.decode().splitlines()[0]
-        args.rank = int(os.getenv('SLURM_NODEID')) * args.ngpus_per_node
-        args.world_size = int(os.getenv('SLURM_NNODES')) * args.ngpus_per_node
-        args.dist_url = f'tcp://{host_name}:58478'
-    elif not args.disable_cuda and args.multi_chan:
-        # single-node distributed training
-        args.rank = 0
-        args.world_size = args.ngpus_per_node
-        args.dist_url = f'tcp://localhost:{random.randrange(49152, 65535)}'
-    # elif not args.disable_cuda and torch.cuda.is_available():
-        # args.device = torch.device('cuda')
-        cudnn.deterministic = True
-        cudnn.benchmark = True
-    # else:
-    #     args.device = torch.device('cpu')
-    #     args.gpu_index = -1
-    torch.multiprocessing.spawn(main_worker, (args,), args.ngpus_per_node)
+# def main(args):
+#     assert args.n_views == 2, "Only two view training is supported. Please use --n-views 2."
+#     # check if gpu training is available
+#     args.ngpus_per_node = torch.cuda.device_count()
+#     assert args.ngpus_per_node > 0, "Only GPU training is currently supported. Please run with at least 1 GPU."
+#     if 'SLURM_JOB_ID' in os.environ:
+#         cmd = 'scontrol show hostnames ' + os.getenv('SLURM_JOB_NODELIST')
+#         stdout = subprocess.check_output(cmd.split())
+#         host_name = stdout.decode().splitlines()[0]
+#         args.rank = int(os.getenv('SLURM_NODEID')) * args.ngpus_per_node
+#         args.world_size = int(os.getenv('SLURM_NNODES')) * args.ngpus_per_node
+#         args.dist_url = f'tcp://{host_name}:58478'
+#     elif not args.disable_cuda and args.multi_chan:
+#         # single-node distributed training
+#         args.rank = 0
+#         args.world_size = args.ngpus_per_node
+#         args.dist_url = f'tcp://localhost:{random.randrange(49152, 65535)}'
+#     # elif not args.disable_cuda and torch.cuda.is_available():
+#         # args.device = torch.device('cuda')
+#         cudnn.deterministic = True
+#         cudnn.benchmark = True
+#     # else:
+#     #     args.device = torch.device('cpu')
+#     #     args.gpu_index = -1
+#     torch.multiprocessing.spawn(main_worker, (args,), args.ngpus_per_node)
 
-def main_worker(gpu, args):
-    args.rank += gpu
+# the above does not allow for one-node one-gpu training. (device_count would count all gpus on the node but doesnt mean these are allocated)
+# consider reinstating the above if single-node multi-gpu training is needed
+def main(args):
+    main_worker(0, args)
     
-    torch.distributed.init_process_group(
-        backend='nccl', init_method=args.dist_url,
-        world_size=args.world_size, rank=args.rank)
+def main_worker(gpu, args):
+    # args.rank += gpu
+    
+    if args.ddp:
+        torch.distributed.init_process_group(
+            backend='nccl', init_method=args.dist_url,
+            world_size=args.world_size, rank=args.rank)
     
     torch.cuda.set_device(gpu)
     torch.backends.cudnn.benchmark = True
@@ -56,13 +62,20 @@ def main_worker(gpu, args):
     dataset = ContrastiveLearningDataset(args.data, args.out_dim, multi_chan=args.multi_chan)
 
     train_dataset = dataset.get_dataset(args.dataset_name, args.n_views, args.noise_scale)
-    sampler = torch.utils.data.distributed.DistributedSampler(train_dataset, drop_last=True)
-    assert args.batch_size % args.world_size == 0
-    per_device_batch_size = args.batch_size // args.world_size
+    print("ddp:", args.ddp)
+    
+    if args.ddp:
+        sampler = torch.utils.data.distributed.DistributedSampler(train_dataset, drop_last=True)
+        assert args.batch_size % args.world_size == 0
+        per_device_batch_size = args.batch_size // args.world_size
 
-    train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=per_device_batch_size,
-        num_workers=args.workers, pin_memory=True, sampler=sampler)
+        train_loader = torch.utils.data.DataLoader(
+            train_dataset, batch_size=per_device_batch_size,
+            num_workers=args.workers, pin_memory=True, sampler=sampler)
+    else:
+        train_loader = torch.utils.data.DataLoader(
+            train_dataset, batch_size=args.batch_size, shuffle=True,
+            num_workers=args.workers, pin_memory=True, drop_last=True)
 
     # define memory and test dataset for knn monitoring
     memory_dataset = WFDataset_lab(args.data, split='train', multi_chan=args.multi_chan)
@@ -149,7 +162,7 @@ if __name__ == "__main__":
                         help='number of data loading workers (default: 32)')
     parser.add_argument('--epochs', default=300, type=int, metavar='N',
                         help='number of total epochs to run')
-    parser.add_argument('-b', '--batch_size', default=1024, type=int,
+    parser.add_argument('-b', '--batch-size', default=1024, type=int,
                         metavar='N',
                         help='mini-batch size (default: 256), this is the total '
                             'batch size of all GPUs on the current node when '
@@ -181,11 +194,15 @@ if __name__ == "__main__":
     parser.add_argument('--submit', action='store_true')
     parser.add_argument('--arg_str', default='--', type=str)
     parser.add_argument('--add_prefix', default='', type=str)
-    parser.add_argument('--no_proj', default='True', action='store_true')
+    parser.add_argument('--no_proj', default=True, action='store_true')
     parser.add_argument('--expand_dim', default=16, type=int)
     parser.add_argument('--multi_chan', default=False, action='store_true')
-    parser.add_argument('--n_channels', default=11, action='store_true')
+    parser.add_argument('--n_channels', default=11, type=int)
 
+    parser.add_argument('--checkpoint-dir', default='./runs', type=str) # can define type as PATH as well
+    parser.add_argument('--log-dir', default='./logs/', type=str) # can define type as PATH as well
+    parser.add_argument('--ddp', action='store_true')
+    parser.add_argument('--rank', default=0, type=int)
     
     args = parser.parse_args()
     
