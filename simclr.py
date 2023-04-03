@@ -11,7 +11,11 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.cuda.amp import GradScaler, autocast
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
-from utils import save_config_file, validation, save_checkpoint, knn_pca_score, knn_monitor
+from utils import (
+    save_config_file, validation, 
+    save_checkpoint, knn_pca_score, knn_monitor,
+    gather_from_all
+)
 
 torch.manual_seed(0)
 
@@ -39,6 +43,7 @@ class SimCLR(object):
         labels = torch.cat([torch.arange(self.args.batch_size) for i in range(self.args.n_views)], dim=0)
         labels = (labels.unsqueeze(0) == labels.unsqueeze(1)).float()
         labels = labels.cuda(self.gpu)
+        features = gather_from_all(features)
         features = torch.squeeze(features)
 
         features = F.normalize(features, dim=1)

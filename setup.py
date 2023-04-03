@@ -5,6 +5,7 @@ version = None
 
 install_requires = [
     "black",
+    "classy-vision",
     "fiftyone",
     "h5py",
     "hydra-core",
