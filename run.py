@@ -70,7 +70,7 @@ def main_worker(gpu, args):
         memory_dataset, batch_size=args.batch_size, shuffle=False,
         num_workers=args.workers, pin_memory=True, drop_last=False)
     
-    test_dataset = WFDataset_lab(args.data, split='test', multi_chan=args.multi_chan)
+    test_dataset = WFDataset_lab(args.data, splååit='test', multi_chan=args.multi_chan)
     test_loader = torch.utils.data.DataLoader(
         test_dataset, batch_size=args.batch_size, shuffle=False,
         num_workers=args.workers, pin_memory=True, drop_last=False)

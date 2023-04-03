@@ -20,24 +20,25 @@ class SimCLR(object):
 
     def __init__(self, *args, **kwargs):
         self.args = kwargs['args']
+        self.gpu = kwargs['gpu']
         # self.model = kwargs['model'].double().cuda(self.args.device)
-        self.model = kwargs['model'].double().cuda(kwargs['gpu'])
+        self.model = kwargs['model'].double().cuda(self.gpu)
         self.model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(self.model)
-        self.model = DDP(self.model, device_ids=[self.args.device])
-        # self.model = kwargs['model'].to(self.args.device)
-        self.proj = kwargs['proj'].to(self.args.device) if kwargs['proj'] is not None else None
+        self.model = DDP(self.model, device_ids=[self.gpu])
+        # self.model = kwargs['model'].cuda(self.args.device)
+        self.proj = kwargs['proj'].cuda(kwargs['gpu']) if kwargs['proj'] is not None else None
         self.optimizer = kwargs['optimizer']
         self.scheduler = kwargs['scheduler']
         self.writer = SummaryWriter('./logs/'+self.args.exp)
         self.multichan = self.args.multi_chan
         logging.basicConfig(filename=os.path.join(self.writer.log_dir, 'training.log'), level=logging.DEBUG)
-        self.criterion = torch.nn.CrossEntropyLoss().to(self.args.device)
+        self.criterion = torch.nn.CrossEntropyLoss().cuda(self.gpu)
 
     def info_nce_loss(self, features):
 
         labels = torch.cat([torch.arange(self.args.batch_size) for i in range(self.args.n_views)], dim=0)
         labels = (labels.unsqueeze(0) == labels.unsqueeze(1)).float()
-        labels = labels.to(self.args.device)
+        labels = labels.cuda(self.gpu)
         features = torch.squeeze(features)
 
         features = F.normalize(features, dim=1)
@@ -48,7 +49,7 @@ class SimCLR(object):
         # assert similarity_matrix.shape == labels.shape
 
         # discard the main diagonal from both: labels and similarities matrix
-        mask = torch.eye(labels.shape[0], dtype=torch.bool).to(self.args.device)
+        mask = torch.eye(labels.shape[0], dtype=torch.bool).cuda(self.gpu)
         labels = labels[~mask].view(labels.shape[0], -1)
         similarity_matrix = similarity_matrix[~mask].view(similarity_matrix.shape[0], -1)
         # assert similarity_matrix.shape == labels.shape
@@ -60,7 +61,7 @@ class SimCLR(object):
         negatives = similarity_matrix[~labels.bool()].view(similarity_matrix.shape[0], -1)
 
         logits = torch.cat([positives, negatives], dim=1)
-        labels = torch.zeros(logits.shape[0], dtype=torch.long).to(self.args.device)
+        labels = torch.zeros(logits.shape[0], dtype=torch.long).cuda(self.gpu)
 
         logits = logits / self.args.temperature
         return logits, labels
@@ -90,8 +91,8 @@ class SimCLR(object):
                     wf = torch.unsqueeze(wf, dim=1)
                 # print(wf.shape)
 
-                wf = wf.double().to(self.args.device)
-                # wf = wf.float().to(self.args.device)
+                wf = wf.double().cuda(self.gpu)
+                # wf = wf.float().cuda(self.args.device)
                 # print(wf.shape)
 
                 with autocast(enabled=self.args.fp16_precision):
@@ -113,7 +114,7 @@ class SimCLR(object):
                 #     knn_score = knn_monitor(net=self.model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True)
                 #     print(f"loss: {loss}, knn_acc:{knn_score}")
                 if n_iter % self.args.log_every_n_steps == 0:
-                    knn_score = validation(self.model, self.args.out_dim, self.args.data, self.args.device)
+                    knn_score = validation(self.model, self.args.out_dim, self.args.data, self.gpu)
                     print(f"loss: {loss}, knn_acc:{knn_score}")
                 
                 n_iter += 1
