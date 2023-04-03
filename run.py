@@ -56,7 +56,7 @@ def main_worker(gpu, args):
     dataset = ContrastiveLearningDataset(args.data, args.out_dim, multi_chan=args.multi_chan)
 
     train_dataset = dataset.get_dataset(args.dataset_name, args.n_views, args.noise_scale)
-    sampler = torch.utils.data.distributed.DistributedSampler(dataset, drop_last=True)
+    sampler = torch.utils.data.distributed.DistributedSampler(train_dataset, drop_last=True)
     assert args.batch_size % args.world_size == 0
     per_device_batch_size = args.batch_size // args.world_size
 
