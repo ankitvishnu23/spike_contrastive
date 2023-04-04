@@ -39,6 +39,8 @@ class AmpJitter(object):
 
     def __call__(self, sample):
         wf = sample
+        if len(wf.shape) == 1:
+            wf = torch.unsqueeze(wf, dim=0)
         n_chans = wf.shape[0]
 
         for i in range(n_chans):
@@ -57,6 +59,8 @@ class GaussianNoise(object):
     """
     def __call__(self, sample):
         wf = sample
+        if len(wf.shape) == 1:
+            wf = torch.unsqueeze(wf, dim=0)
         n_chans = wf.shape[0]
         w = wf.shape[1]
         
@@ -93,6 +97,8 @@ class SmartNoise(object):
 
     def __call__(self, sample):
         wf = sample
+        if len(wf.shape) == 1:
+            wf = torch.unsqueeze(wf, dim=0)
         n_chans = wf.shape[0]
         w = wf.shape[1]
 
@@ -140,6 +146,8 @@ class Collide(object):
 
     def __call__(self, sample):
         wf = sample
+        if len(wf.shape) == 1:
+            wf = torch.unsqueeze(wf, dim=0)
         n_chans = wf.shape[0]
         w = wf.shape[1]
 
@@ -196,6 +204,8 @@ class Jitter(object):
 
     def __call__(self, sample):
         wf = sample
+        if len(wf.shape) == 1:
+            wf = torch.unsqueeze(wf, dim=0)
         n_chans = wf.shape[0]
         w = wf.shape[1]
         

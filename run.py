@@ -70,7 +70,7 @@ def main_worker(gpu, args):
         per_device_batch_size = args.batch_size // args.world_size
 
         train_loader = torch.utils.data.DataLoader(
-            train_dataset, batch_size=per_device_batch_size,
+            train_dataset, batch_size=per_device_batch_size, drop_last=True,
             num_workers=args.workers, pin_memory=True, sampler=sampler)
     else:
         train_loader = torch.utils.data.DataLoader(
