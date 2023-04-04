@@ -50,8 +50,9 @@ class SimCLR(object):
         features = gather_from_all(features)
         features = torch.squeeze(features)
         features = F.normalize(features, dim=1)
+        batch_dim = int(features.shape[0] // 2)
 
-        labels = torch.cat([torch.arange(features.shape[0]) for i in range(self.args.n_views)], dim=0)
+        labels = torch.cat([torch.arange(batch_dim) for i in range(self.args.n_views)], dim=0)
         labels = (labels.unsqueeze(0) == labels.unsqueeze(1)).float()
         labels = labels.cuda(self.gpu)
 
