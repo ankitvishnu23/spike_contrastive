@@ -70,7 +70,7 @@ def main_worker(gpu, args):
         per_device_batch_size = args.batch_size // args.world_size
 
         train_loader = torch.utils.data.DataLoader(
-            train_dataset, batch_size=per_device_batch_size, drop_last=True,
+            train_dataset, batch_size=per_device_batch_size,
             num_workers=args.workers, pin_memory=True, sampler=sampler)
     else:
         train_loader = torch.utils.data.DataLoader(
@@ -121,7 +121,8 @@ def main_worker(gpu, args):
         
     #  It’s a no-op if the 'gpu_index' argument is a negative integer or None.
     # with torch.cuda.device(args.gpu_index):
-    simclr = SimCLR(model=model, proj=proj, optimizer=optimizer, scheduler=scheduler, gpu=gpu, args=args, start_epoch=start_epoch)
+    simclr = SimCLR(model=model, proj=proj, optimizer=optimizer, scheduler=scheduler, gpu=gpu, 
+                    sampler=sampler, args=args, start_epoch=start_epoch)
     simclr.train(train_loader, memory_loader, test_loader)
 
 def make_sh_and_submit(args):

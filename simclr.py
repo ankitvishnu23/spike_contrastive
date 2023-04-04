@@ -25,6 +25,7 @@ class SimCLR(object):
     def __init__(self, *args, **kwargs):
         self.args = kwargs['args']
         self.gpu = kwargs['gpu']
+        self.sampler = kwargs['sampler']
         # self.model = kwargs['model'].double().cuda(self.args.device)
         self.model = kwargs['model'].double().cuda(self.gpu)
         if self.args.ddp:
@@ -46,13 +47,13 @@ class SimCLR(object):
 
     def info_nce_loss(self, features):
 
-        labels = torch.cat([torch.arange(self.args.batch_size) for i in range(self.args.n_views)], dim=0)
-        labels = (labels.unsqueeze(0) == labels.unsqueeze(1)).float()
-        labels = labels.cuda(self.gpu)
         features = gather_from_all(features)
         features = torch.squeeze(features)
-
         features = F.normalize(features, dim=1)
+
+        labels = torch.cat([torch.arange(features.shape[0]) for i in range(self.args.n_views)], dim=0)
+        labels = (labels.unsqueeze(0) == labels.unsqueeze(1)).float()
+        labels = labels.cuda(self.gpu)
 
         similarity_matrix = torch.matmul(features, features.T)
         # assert similarity_matrix.shape == (
@@ -93,6 +94,7 @@ class SimCLR(object):
         pca_score = 0
 
         for epoch_counter in range(self.start_epoch, self.args.epochs):
+            self.sampler.set_epoch(epoch_counter)
             print('Epoch {}'.format(epoch_counter))
             for wf in tqdm(train_loader):
                 wf = torch.cat(wf, dim=0)
