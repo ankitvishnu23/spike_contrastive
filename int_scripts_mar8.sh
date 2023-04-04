@@ -81,4 +81,6 @@ do
 python run.py --submit --arg_str="--out_dim=5 --proj_dim=5 --batch-size=512 --lr=${lr} --arch=attention --epochs=800 --multi_chan "
 done
 
-python run.py --out_dim=5 --proj_dim=5 --batch-size=256 --lr=0.01 --arch=attention --epochs=800 --multi_chan 
+python run.py --out_dim=5 --proj_dim=5 --batch-size=8 --lr=0.01 --arch=attention --epochs=800 --multi_chan 
+
+python run.py --out_dim=5 --proj_dim=5 --batch-size=32 --lr=0.01 --arch=attention --epochs=800 --multi_chan --data=./dy016/

@@ -16,7 +16,7 @@ from utils import (
     save_checkpoint, knn_pca_score, knn_monitor,
     gather_from_all
 )
-
+import tensorboard_logger as tb_logger
 torch.manual_seed(0)
 
 
@@ -35,11 +35,12 @@ class SimCLR(object):
         self.optimizer = kwargs['optimizer']
         self.scheduler = kwargs['scheduler']
         # self.writer = SummaryWriter('./logs/'+self.args.exp)
-        self.writer = SummaryWriter(self.args.log_dir+self.args.exp)
-        
+        if self.args.rank == 0 or not self.args.ddp:
+            # self.writer = SummaryWriter(os.path.join(self.args.log_dir,self.args.exp))
+            self.logger = tb_logger.Logger(logdir=self.args.log_dir, flush_secs=2)
         self.multichan = self.args.multi_chan
         if self.args.rank == 0 or not self.args.ddp:
-            logging.basicConfig(filename=os.path.join(self.writer.log_dir, 'training.log'), level=logging.DEBUG)
+            logging.basicConfig(filename=os.path.join(self.args.log_dir, 'training.log'), level=logging.DEBUG)
         self.criterion = torch.nn.CrossEntropyLoss().cuda(self.gpu)
         self.start_epoch = kwargs['start_epoch']
 
@@ -132,11 +133,15 @@ class SimCLR(object):
                     
             if self.args.rank == 0 or not self.args.ddp:
                 logging.debug(f"Epoch: {epoch_counter}\tLoss: {loss}")
-                self.writer.add_scalar('loss', loss, epoch_counter)
+                self.logger.log_value('loss', loss, epoch_counter)
+                # self.writer.add_scalar('loss', loss, epoch_counter)
                 # self.writer.add_scalar('pca_knn_score', pca_score, global_step=n_iter)
-                self.writer.add_scalar('knn_score', knn_score, epoch_counter)
+                # self.writer.add_scalar('knn_score', knn_score, epoch_counter)
+                self.logger.log_value('knn_score', knn_score, epoch_counter)
+                
                 curr_lr = self.optimizer.param_groups[0]['lr'] if self.scheduler == None else self.scheduler.get_lr()[0]
-                self.writer.add_scalar('learning_rate', curr_lr, epoch_counter)
+                # self.writer.add_scalar('learning_rate', curr_lr, epoch_counter)
+                self.logger.log_value('learning_rate', curr_lr, epoch_counter)
 
         if self.args.rank == 0 or not self.args.ddp:
             logging.info("Training has finished.")
