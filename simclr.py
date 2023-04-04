@@ -95,7 +95,8 @@ class SimCLR(object):
         pca_score = 0
 
         for epoch_counter in range(self.start_epoch, self.args.epochs):
-            self.sampler.set_epoch(epoch_counter)
+            if self.args.ddp:
+                self.sampler.set_epoch(epoch_counter)
             print('Epoch {}'.format(epoch_counter))
             for wf in tqdm(train_loader):
                 wf = torch.cat(wf, dim=0)
