@@ -107,17 +107,18 @@ class SmartNoise(object):
         n_neigh, _ = self.spatial_cov.shape
         waveform_length, _ = self.temporal_cov.shape
 
+        noise = np.random.normal(size=(waveform_length, n_neigh))
+
+        noise = np.matmul(noise.T, self.temporal_cov).T
+        reshaped_noise = np.reshape(noise, (-1, n_neigh))
+
+        the_noise = np.reshape(np.matmul(reshaped_noise, self.spatial_cov),
+                        (waveform_length, n_neigh))
+
+        noise_sel = np.random.choice(n_neigh, n_chans, replace=False)
+
         for i in range(n_chans):
-            noise = np.random.normal(size=(waveform_length, n_neigh))
-
-            noise = np.matmul(noise.T, self.temporal_cov).T
-            reshaped_noise = np.reshape(noise, (-1, n_neigh))
-
-            the_noise = np.reshape(np.matmul(reshaped_noise, self.spatial_cov),
-                            (waveform_length, n_neigh))
-
-            noise_sel = np.random.choice(n_neigh)
-            noise_wf = the_noise[:, noise_sel]
+            noise_wf = the_noise[:, noise_sel[i]]
             noise_wf = self.noise_scale * noise_wf
             wf[i] = np.add(wf[i], noise_wf)
 

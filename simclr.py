@@ -27,12 +27,12 @@ class SimCLR(object):
         self.gpu = kwargs['gpu']
         self.sampler = kwargs['sampler']
         # self.model = kwargs['model'].double().cuda(self.args.device)
-        self.model = kwargs['model'].double().cuda(self.gpu)
+        self.model = kwargs['model'].double().to(self.gpu)
         if self.args.ddp:
             self.model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(self.model)
             self.model = DDP(self.model, device_ids=[self.gpu], find_unused_parameters=True)
         # self.model = kwargs['model'].cuda(self.args.device)
-        self.proj = kwargs['proj'].cuda(kwargs['gpu']) if kwargs['proj'] is not None else None
+        self.proj = kwargs['proj'].to(kwargs['gpu']) if kwargs['proj'] is not None else None
         self.optimizer = kwargs['optimizer']
         self.scheduler = kwargs['scheduler']
         # self.writer = SummaryWriter('./logs/'+self.args.exp)
@@ -54,7 +54,7 @@ class SimCLR(object):
 
         labels = torch.cat([torch.arange(batch_dim) for i in range(self.args.n_views)], dim=0)
         labels = (labels.unsqueeze(0) == labels.unsqueeze(1)).float()
-        labels = labels.cuda(self.gpu)
+        labels = labels.to(self.gpu)
 
         similarity_matrix = torch.matmul(features, features.T)
         # assert similarity_matrix.shape == (
@@ -62,7 +62,7 @@ class SimCLR(object):
         # assert similarity_matrix.shape == labels.shape
 
         # discard the main diagonal from both: labels and similarities matrix
-        mask = torch.eye(labels.shape[0], dtype=torch.bool).cuda(self.gpu)
+        mask = torch.eye(labels.shape[0], dtype=torch.bool).to(self.gpu)
         labels = labels[~mask].view(labels.shape[0], -1)
         similarity_matrix = similarity_matrix[~mask].view(similarity_matrix.shape[0], -1)
         # assert similarity_matrix.shape == labels.shape
@@ -74,7 +74,7 @@ class SimCLR(object):
         negatives = similarity_matrix[~labels.bool()].view(similarity_matrix.shape[0], -1)
 
         logits = torch.cat([positives, negatives], dim=1)
-        labels = torch.zeros(logits.shape[0], dtype=torch.long).cuda(self.gpu)
+        labels = torch.zeros(logits.shape[0], dtype=torch.long).to(self.gpu)
 
         logits = logits / self.args.temperature
         return logits, labels
@@ -87,7 +87,7 @@ class SimCLR(object):
         # save_config_file('./runs-args', self.args)
 
         n_iter = 0
-        if self.args.rank == 0 or not self.args.ddp:    
+        if self.args.rank == 0 or not self.args.ddp:
             logging.info(f"Start SimCLR training for {self.args.epochs} epochs.")
             logging.info(f"Training with gpu: {not self.args.disable_cuda}.")
 
@@ -100,11 +100,11 @@ class SimCLR(object):
             print('Epoch {}'.format(epoch_counter))
             for wf in tqdm(train_loader):
                 wf = torch.cat(wf, dim=0)
-                wf = torch.squeeze(wf)
-                if not self.multichan:
-                    wf = torch.unsqueeze(wf, dim=1)
+                # wf = torch.squeeze(wf)
+                # if not self.multichan:
+                #     wf = torch.unsqueeze(wf, dim=1)
 
-                wf = wf.double().cuda(self.gpu)
+                wf = wf.double().to(self.gpu)
                 # wf = wf.float().cuda(self.args.device)
                 with autocast(enabled=self.args.fp16_precision):
                     features = self.model(wf)
