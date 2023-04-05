@@ -47,7 +47,8 @@ class SimCLR(object):
 
     def info_nce_loss(self, features):
 
-        features = gather_from_all(features)
+        if self.args.ddp:
+            features = gather_from_all(features)
         features = torch.squeeze(features)
         features = F.normalize(features, dim=1)
         batch_dim = int(features.shape[0] // 2)
