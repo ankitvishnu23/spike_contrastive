@@ -50,12 +50,15 @@ def main_worker(gpu, args):
     # args.rank += gpu
     
     if args.ddp:
+        os.environ["MASTER_ADDR"] = "localhost"
+        os.environ["MASTER_PORT"] = "12355"
         torch.distributed.init_process_group(
             backend='nccl',
             world_size=args.world_size, rank=args.rank)
     
-    torch.cuda.set_device(gpu)
+    # torch.cuda.set_device(gpu)
     torch.backends.cudnn.benchmark = True
+    # torch.backends.cudnn.deterministic = True
 
     tr_dataset = WFDataset_lab(args.data, split='train')
     te_dataset = WFDataset_lab(args.data, split='test')
