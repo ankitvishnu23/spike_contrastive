@@ -43,14 +43,15 @@ from simclr import SimCLR
 # the above does not allow for one-node one-gpu training. (device_count would count all gpus on the node but doesnt mean these are allocated)
 # consider reinstating the above if single-node multi-gpu training is needed
 def main(args):
-    main_worker(0, args)
+    # main_worker(0, args)
+    torch.multiprocessing.spawn(main_worker, (args,), args.world_size)
     
 def main_worker(gpu, args):
     # args.rank += gpu
     
     if args.ddp:
         torch.distributed.init_process_group(
-            backend='nccl', init_method=args.dist_url,
+            backend='nccl',
             world_size=args.world_size, rank=args.rank)
     
     torch.cuda.set_device(gpu)
@@ -126,6 +127,7 @@ def main_worker(gpu, args):
     simclr = SimCLR(model=model, proj=proj, optimizer=optimizer, scheduler=scheduler, gpu=gpu, 
                     sampler=sampler, args=args, start_epoch=start_epoch)
     simclr.train(train_loader, memory_loader, test_loader)
+    torch.distributed.destroy_process_group()
 
 def make_sh_and_submit(args):
     os.makedirs('./scripts/', exist_ok=True)
