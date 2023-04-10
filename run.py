@@ -177,8 +177,8 @@ if __name__ == "__main__":
                         help='default: custom_encoder)')
     parser.add_argument('-ns', '--noise_scale', default=1.0,
                         help='how much to scale the noise augmentation (default: 1)')
-    parser.add_argument('-j', '--workers', default=32, type=int, metavar='N',
-                        help='number of data loading workers (default: 32)')
+    parser.add_argument('-j', '--workers', default=12, type=int, metavar='N',
+                        help='number of data loading workers (default: 12)')
     parser.add_argument('--epochs', default=300, type=int, metavar='N',
                         help='number of total epochs to run')
     parser.add_argument('-b', '--batch-size', default=1024, type=int,

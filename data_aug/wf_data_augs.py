@@ -42,10 +42,13 @@ class AmpJitter(object):
         if len(wf.shape) == 1:
             wf = np.expand_dims(wf, axis=0)
         n_chans = wf.shape[0]
+        
+        amp_jit = np.random.uniform(self.lo, self.hi, n_chans)
 
-        for i in range(n_chans):
-            amp_jit = np.random.uniform(self.lo, self.hi)
-            wf[i] = amp_jit * wf[i]
+        wf = wf * amp_jit[:, None]
+        # for i in range(n_chans):
+        #     amp_jit = np.random.uniform(self.lo, self.hi)
+        #     wf[i] = amp_jit * wf[i]
     
         return wf
 
@@ -78,7 +81,7 @@ class SmartNoise(object):
             matched to output_size. If int, smaller of image edges is matched
             to output_size keeping aspect ratio the same.
     """
-    root_folder = '/home/jovyan/nyu47-templates/'
+    root_folder = '/Users/ankit/Documents/PaninskiLab/contrastive_spikes/DY016/'
     temporal_name = 'temporal_cov_example.npy'
     spatial_name = 'spatial_cov_example.npy'
 
@@ -116,11 +119,13 @@ class SmartNoise(object):
                         (waveform_length, n_neigh))
 
         noise_sel = np.random.choice(n_neigh, n_chans, replace=False)
+        noise_wfs = self.noise_scale * the_noise[:, noise_sel].T
+        wf = wf + noise_wfs
 
-        for i in range(n_chans):
-            noise_wf = the_noise[:, noise_sel[i]]
-            noise_wf = self.noise_scale * noise_wf
-            wf[i] = np.add(wf[i], noise_wf)
+        # for i in range(n_chans):
+        #     noise_wf = the_noise[:, noise_sel[i]]
+        #     noise_wf = self.noise_scale * noise_wf
+        #     wf[i] = np.add(wf[i], noise_wf)
 
         return wf
 
@@ -210,54 +215,52 @@ class Jitter(object):
         n_chans = wf.shape[0]
         w = wf.shape[1]
         
-        for i in range(n_chans):
-            resample = sp.signal.resample(
-                x=wf[i],
-                num=w*self.up_factor,
-                axis=0)
-            up_temp = resample.T
+        up_temp = sp.signal.resample(
+            x=wf,
+            num=w*self.up_factor,
+            axis=1)
             
-            idx = (np.arange(0, w)[:,None]*self.up_factor + np.arange(self.up_factor))
-            up_shifted_temp = up_temp[idx].T
+        idx = (np.arange(0, w)[:,None]*self.up_factor + np.arange(self.up_factor))
+        up_shifted_temp = np.transpose(up_temp[:, idx], (0, 2, 1))
 
-            # temp_idx = np.random.choice(0, len(self.templates))
-            # temp_sel = self.templates[temp_idx]
+        # temp_idx = np.random.choice(0, len(self.templates))
+        # temp_sel = self.templates[temp_idx]
 
-            # idx = np.arange(0, self.up_factor*w).reshape(-1, self.up_factor)
-            # up_shifted_wfs = wf_upsamp[idx]
-            # up_shifted_temps.unsqueeze(1)
-            # up_shifted_temps = torch.cat(
-            #     (up_shifted_temps,temp_sel),
-            #     axis=1)
-            
+        # idx = np.arange(0, self.up_factor*w).reshape(-1, self.up_factor)
+        # up_shifted_wfs = wf_upsamp[idx]
+        # up_shifted_temps.unsqueeze(1)
+        # up_shifted_temps = torch.cat(
+        #     (up_shifted_temps,temp_sel),
+        #     axis=1)
+        
 
-            shift = (2* np.random.binomial(1, 0.5)-1) * np.random.uniform(0, self.shift)
-            
-            idx_selection = np.random.choice(self.up_factor)
-            wf[i] = up_shifted_temp[idx_selection]
-            wf[i] = self.shift_chans(wf[i], shift)
+        shift = (2* np.random.binomial(1, 0.5)-1) * np.random.uniform(0, self.shift)
+        
+        idx_selection = np.random.choice(self.up_factor, n_chans)
+        wf = up_shifted_temp[np.arange(n_chans), idx_selection]
+        wf = self.shift_chans(wf, shift)
 
         return wf
 
     def shift_chans(self, wf, shift_):
         # use template feat_channel shifts to interpolate shift of all spikes on all other chans
         int_shift = int(math.ceil(shift_)) if shift_ >= 0 else -int(math.floor(shift_))
-        curr_wf_pos = np.pad(wf, (0, int_shift), 'constant') 
-        curr_wf_neg = np.pad(wf, (int_shift, 0), 'constant')
+        curr_wf_pos = np.pad(wf, ((0, 0), (0, int_shift)), 'constant') 
+        curr_wf_neg = np.pad(wf, ((0, 0), (int_shift, 0)), 'constant')
         if int(shift_)==shift_:
             ceil = int(shift_)
-            temp = np.roll(curr_wf_pos,ceil,axis=0)[:-int_shift] if shift_ > 0 else np.roll(curr_wf_neg,ceil,axis=0)[int_shift:]
+            temp = np.roll(curr_wf_pos,ceil,axis=1)[:, :-int_shift] if shift_ > 0 else np.roll(curr_wf_neg,ceil,axis=1)[:, int_shift:]
         else:
             ceil = int(math.ceil(shift_))
             floor = int(math.floor(shift_))
             if shift_ > 0:
-                temp = (np.roll(curr_wf_pos,ceil,axis=0)*(shift_-floor))[:-ceil] + (np.roll(curr_wf_pos,floor, axis=0)*(ceil-shift_))[:-ceil]
+                temp = (np.roll(curr_wf_pos,ceil,axis=1)*(shift_-floor))[:, :-ceil] + (np.roll(curr_wf_pos,floor, axis=1)*(ceil-shift_))[:, :-ceil]
             else:
-                temp = (np.roll(curr_wf_neg,ceil,axis=0)*(shift_-floor))[-floor:] + (np.roll(curr_wf_neg,floor, axis=0)*(ceil-shift_))[-floor:]
+                temp = (np.roll(curr_wf_neg,ceil,axis=1)*(shift_-floor))[:, -floor:] + (np.roll(curr_wf_neg,floor, axis=1)*(ceil-shift_))[:, -floor:]
         wf_final = temp
 
         return wf_final
-
+    
 
 class PCA_Reproj(object):
     """Rescale the image in a sample to a given size.
