@@ -290,7 +290,7 @@ class ToWfTensor(object):
         if len(wf.shape) == 1:
             wf = np.expand_dims(wf, axis=0)
         
-        return torch.from_numpy(wf)
+        return torch.from_numpy(wf.astype('float16'))
 
 
 ###### TORCH VERSIONS ######

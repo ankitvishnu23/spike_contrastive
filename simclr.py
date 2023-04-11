@@ -27,7 +27,7 @@ class SimCLR(object):
         self.gpu = kwargs['gpu']
         self.sampler = kwargs['sampler']
         # self.model = kwargs['model'].double().cuda(self.args.device)
-        self.model = kwargs['model'].double().to(self.gpu)
+        self.model = kwargs['model'].to(self.gpu)
         if self.args.ddp:
             self.model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(self.model)
             self.model = DDP(self.model, device_ids=[self.gpu], find_unused_parameters=True)
@@ -107,7 +107,7 @@ class SimCLR(object):
 
                 wf = wf.double().to(self.gpu)
                 # wf = wf.float().cuda(self.args.device)
-                with autocast(enabled=self.args.fp16_precision):
+                with autocast(dtype=self.args.fp16_precision, enabled=True):
                     features = self.model(wf)
                     if self.proj is not None:
                         features = self.proj(features)
