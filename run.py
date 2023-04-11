@@ -43,6 +43,13 @@ from simclr import SimCLR
 # the above does not allow for one-node one-gpu training. (device_count would count all gpus on the node but doesnt mean these are allocated)
 # consider reinstating the above if single-node multi-gpu training is needed
 def main(args):
+    if 'SLURM_JOB_ID' in os.environ:
+        cmd = 'scontrol show hostnames ' + os.getenv('SLURM_JOB_NODELIST')
+        stdout = subprocess.check_output(cmd.split())
+        host_name = stdout.decode().splitlines()[0]
+        args.dist_url = f'tcp://{host_name}:58478'
+    else:
+        args.dist_url = f'tcp://localhost:{random.randrange(49152, 65535)}'
     # main_worker(0, args)
     torch.multiprocessing.spawn(main_worker, (args,), args.world_size)
     
@@ -50,10 +57,8 @@ def main_worker(gpu, args):
     # args.rank += gpu
     
     if args.ddp:
-        os.environ["MASTER_ADDR"] = "localhost"
-        os.environ["MASTER_PORT"] = "12355"
         torch.distributed.init_process_group(
-            backend='nccl',
+            backend='nccl', init_method=args.dist_url,
             world_size=args.world_size, rank=args.rank)
     
     # torch.cuda.set_device(gpu)

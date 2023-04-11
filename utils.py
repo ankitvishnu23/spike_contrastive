@@ -144,11 +144,11 @@ def get_backbone(enc):
 def get_contr_representations(model, data_set, device):
     reps = []
     model = model.double()
-    for item in data_set:
-        with torch.no_grad():
-            wf = torch.from_numpy(item.reshape(1, 1, -1)).double().to(device)
-            rep = model(wf)
-        reps.append(rep.detach().cpu().numpy())
+    data_set = np.expand_dims(data_set, axis=1) if len(data_set.shape) == 2 else data_set
+    with torch.no_grad():
+        wf = torch.from_numpy(data_set).double().to(device)
+        rep = model(wf)
+    rep = rep.detach().cpu().numpy()
     
     return np.squeeze(np.array(reps))
 

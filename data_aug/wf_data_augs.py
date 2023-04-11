@@ -46,9 +46,6 @@ class AmpJitter(object):
         amp_jit = np.random.uniform(self.lo, self.hi, n_chans)
 
         wf = wf * amp_jit[:, None]
-        # for i in range(n_chans):
-        #     amp_jit = np.random.uniform(self.lo, self.hi)
-        #     wf[i] = amp_jit * wf[i]
     
         return wf
 
@@ -67,9 +64,8 @@ class GaussianNoise(object):
         n_chans = wf.shape[0]
         w = wf.shape[1]
         
-        for i in range(n_chans):
-            noise_wf = np.random.normal(0, 1, w)
-            wf[i] = np.add(wf[i], noise_wf)
+        noise_wf = np.random.normal(0, 1, (n_chans, w))
+        wf = np.add(wf, noise_wf)
 
         return wf
 
@@ -122,11 +118,6 @@ class SmartNoise(object):
         noise_wfs = self.noise_scale * the_noise[:, noise_sel].T
         wf = wf + noise_wfs
 
-        # for i in range(n_chans):
-        #     noise_wf = the_noise[:, noise_sel[i]]
-        #     noise_wf = self.noise_scale * noise_wf
-        #     wf[i] = np.add(wf[i], noise_wf)
-
         return wf
 
 class Collide(object):
@@ -159,13 +150,13 @@ class Collide(object):
 
         temp_idx = np.random.randint(0, len(self.templates))
         temp_sel = self.templates[temp_idx]
+        temp_sel = np.expand_dims(temp_sel, axis=0) if len(temp_sel.shape) == 1 else temp_sel
         
         scale = np.random.uniform(0.2, 1)
         shift = (2* np.random.binomial(1, 0.5)-1) * np.random.randint(5, 60)
 
         temp_sel = temp_sel * scale
-        for i in range(n_chans):
-            temp_sel[i] = self.shift_chans(temp_sel[i], shift)
+        temp_sel = self.shift_chans(temp_sel, shift)
 
         wf = np.add(wf, temp_sel)
 
@@ -174,18 +165,18 @@ class Collide(object):
     def shift_chans(self, wf, shift_):
         # use template feat_channel shifts to interpolate shift of all spikes on all other chans
         int_shift = int(math.ceil(shift_)) if shift_ >= 0 else -int(math.floor(shift_))
-        curr_wf_pos = np.pad(wf, (0, int_shift), 'constant') 
-        curr_wf_neg = np.pad(wf, (int_shift, 0), 'constant')
+        curr_wf_pos = np.pad(wf, ((0, 0), (0, int_shift)), 'constant') 
+        curr_wf_neg = np.pad(wf, ((0, 0), (int_shift, 0)), 'constant')
         if int(shift_)==shift_:
             ceil = int(shift_)
-            temp = np.roll(curr_wf_pos,ceil,axis=0)[:-int_shift] if shift_ > 0 else np.roll(curr_wf_neg,ceil,axis=0)[int_shift:]
+            temp = np.roll(curr_wf_pos,ceil,axis=1)[:, :-int_shift] if shift_ > 0 else np.roll(curr_wf_neg,ceil,axis=1)[:, int_shift:]
         else:
             ceil = int(math.ceil(shift_))
             floor = int(math.floor(shift_))
             if shift_ > 0:
-                temp = (np.roll(curr_wf_pos,ceil,axis=0)*(shift_-floor))[:-ceil] + (np.roll(curr_wf_pos,floor, axis=0)*(ceil-shift_))[:-ceil]
+                temp = (np.roll(curr_wf_pos,ceil,axis=1)*(shift_-floor))[:, :-ceil] + (np.roll(curr_wf_pos,floor, axis=1)*(ceil-shift_))[:, :-ceil]
             else:
-                temp = (np.roll(curr_wf_neg,ceil,axis=0)*(shift_-floor))[-floor:] + (np.roll(curr_wf_neg,floor, axis=0)*(ceil-shift_))[-floor:]
+                temp = (np.roll(curr_wf_neg,ceil,axis=1)*(shift_-floor))[:, -floor:] + (np.roll(curr_wf_neg,floor, axis=1)*(ceil-shift_))[:, -floor:]
         wf_final = temp
 
         return wf_final
