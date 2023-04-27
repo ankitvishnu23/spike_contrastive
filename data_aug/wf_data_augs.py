@@ -161,7 +161,7 @@ class Collide(object):
         wf = np.add(wf, temp_sel)
 
         return wf
-
+    
     def shift_chans(self, wf, shift_):
         # use template feat_channel shifts to interpolate shift of all spikes on all other chans
         int_shift = int(math.ceil(shift_)) if shift_ >= 0 else -int(math.floor(shift_))
