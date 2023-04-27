@@ -16,7 +16,7 @@ python \
       $HOME2/scratch/spike_contrastive/launcher.py \
       --data $HOME2/scratch/spike_contrastive/dy016/ \
       --epochs 800 \
-      --batch-size 256 \
+      --batch-size 512 \
       --out_dim 5 \
       --proj_dim 5 \
       --lr ${lr} \
@@ -26,7 +26,7 @@ python \
       --log-dir $HOME2/scratch/spike_contrastive/logs/ \
       --nodes 2 \
       --ngpus-per-node 4 \
-      --exp mc4_out5proj5_bs256_ep800_lr${lr}
+      --exp mc5_out5proj5_bs512_ep800_lr${lr}
 done
 echo "Run completed at:- "
 date

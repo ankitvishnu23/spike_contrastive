@@ -143,10 +143,10 @@ def get_backbone(enc):
 
 def get_contr_representations(model, data_set, device):
     reps = []
-    model = model.double()
+    # model = model.double()
     for item in data_set:
         with torch.no_grad():
-            wf = torch.from_numpy(item.reshape(1, 1, -1)).double().to(device)
+            wf = torch.from_numpy(item.reshape(1, 1, -1)).to(device)
             rep = model(wf)
         reps.append(rep.detach().cpu().numpy())
     
@@ -234,7 +234,7 @@ def knn_predict(feature, feature_bank, feature_labels, classes, knn_k, knn_t):
 
 # test using a knn monitor
 def knn_monitor(net, memory_data_loader, test_data_loader, device='cuda', k=200, t=0.1, hide_progress=False,
-                targets=None):
+                targets=None, args=None):
     if not targets:
         targets = memory_data_loader.dataset.targets
 
@@ -245,7 +245,10 @@ def knn_monitor(net, memory_data_loader, test_data_loader, device='cuda', k=200,
     with torch.no_grad():
         # generate feature bank
         for data, target in memory_data_loader:
-            feature = net(data.to(device=device, non_blocking=True).unsqueeze(dim=1))
+            if args.use_gpt:
+                feature = net(data.to(device=device, non_blocking=True).unsqueeze(dim=-1))
+            else:
+                feature = net(data.to(device=device, non_blocking=True).unsqueeze(dim=1))
             feature = F.normalize(feature, dim=1)
             feature_bank.append(feature)
         # [D, N]
@@ -257,7 +260,10 @@ def knn_monitor(net, memory_data_loader, test_data_loader, device='cuda', k=200,
         for data, target in test_data_loader:
             
             data, target = data.to(device=device, non_blocking=True), target.to(device=device, non_blocking=True)
-            feature = net(data.unsqueeze(dim=1))
+            if args.use_gpt:
+                feature = net(data.unsqueeze(dim=-1))
+            else:
+                feature = net(data.unsqueeze(dim=1))
             feature = F.normalize(feature, dim=1)
 
             pred_labels = knn_predict(feature, feature_bank, feature_labels, classes, k, t)

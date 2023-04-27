@@ -40,7 +40,7 @@ parser.add_argument('--seed', default=None, type=int,
                     help='seed for initializing training. ')
 parser.add_argument('--disable-cuda', action='store_true',
                     help='Disable CUDA')
-parser.add_argument('--fp16-precision', action='store_true',
+parser.add_argument('--fp16', action='store_true',
                     help='Whether or not to use 16-bit precision GPU training.')
 parser.add_argument('--out_dim', default=5, type=int,
                     help='feature dimension (default: 2)')
@@ -62,7 +62,22 @@ parser.add_argument('--expand_dim', default=16, type=int)
 parser.add_argument('--multi_chan', default=False, action='store_true')
 parser.add_argument('--n_channels', default=11, type=int)
 parser.add_argument('--ddp', default=True, action='store_true')
+parser.add_argument('--eval_knn_every_n_epochs', default=1000, type=int)
 
+parser.add_argument('--use_gpt', action='store_true') # default = False
+
+parser.add_argument('--n_layer', default=20, type=int)
+parser.add_argument('--n_head', default=4, type=int)
+parser.add_argument('--n_embd', default=64, type=int)
+parser.add_argument('--is_causal', action='store_true') # default = False
+# parser.add_argument('--block_size', default=2678, type=int) # this is the max sequence length
+parser.add_argument('--block_size', default=1331, type=int) # this is the max sequence length
+
+parser.add_argument('--dropout', default=0.2, type=float)
+parser.add_argument('--bias', action='store_true') # default = False
+parser.add_argument('--vocab_size', default=50304, type=int) # default to GPT-2 vocab size
+
+parser.add_argument('--online_head', action='store_true', default=True) # default = True
     
 # Slurm setting
 parser.add_argument('--ngpus-per-node', default=6, type=int, metavar='N',

@@ -310,7 +310,6 @@ class AttentionEnc(nn.Module):
         output = self.transformer_encoder(src, src_mask)
         output = output.view(-1, self.spike_size * self.expand_dim)
         output = self.fcpart(output)
-        
         return output
 
     def load(self, fname_model):

@@ -7,7 +7,7 @@ from torchvision.transforms import transforms
 from data_aug.gaussian_blur import GaussianBlur
 from torchvision import transforms, datasets
 from torch.utils.data import Dataset
-from data_aug.view_generator import ContrastiveLearningViewGenerator
+from data_aug.view_generator import ContrastiveLearningViewGenerator, LabelViewGenerator
 from exceptions.exceptions import InvalidDatasetSelection
 from data_aug.wf_data_augs import AmpJitter, Jitter, Collide, SmartNoise, ToWfTensor, PCA_Reproj
 from typing import Any, Callable, Optional, Tuple
@@ -19,7 +19,8 @@ class WFDataset(Dataset):
     def __init__(
         self,
         root: str,
-        transform: Optional[Callable] = None
+        transform: Optional[Callable] = None,
+        target_transform: Optional[Callable] = None,
     ) -> None:
 
         super().__init__()
@@ -27,10 +28,13 @@ class WFDataset(Dataset):
         self.data: Any = []
 
         # now load the numpy array
-        self.data = np.load(root + self.filename)
+        self.data = np.load(root + self.filename).astype('float32')
         print(self.data.shape)
         self.root = root
         self.transform = transform
+        self.targets = np.array([[i for j in range(1200)] \
+                                for i in range(10)]).reshape(-1).astype('long')
+        self.target_transform = target_transform
 
     def __getitem__(self, index: int) -> Any :
         """
@@ -41,6 +45,7 @@ class WFDataset(Dataset):
             tensor: wf
         """
         wf = self.data[index].astype('float32')
+        y = self.targets[index].astype('long')
 
         # doing this so that it is a tensor
         # wf = torch.from_numpy(wf)
@@ -48,7 +53,10 @@ class WFDataset(Dataset):
         if self.transform is not None:
             wf = self.transform(wf)
 
-        return wf
+        if self.target_transform is not None:
+            y = self.target_transform(y)
+            
+        return wf, y
 
 
     def __len__(self) -> int:
@@ -61,7 +69,8 @@ class WF_MultiChan_Dataset(Dataset):
     def __init__(
         self,
         root: str,
-        transform: Optional[Callable] = None
+        transform: Optional[Callable] = None,
+        target_transform: Optional[Callable] = None
     ) -> None:
 
         super().__init__()
@@ -73,6 +82,9 @@ class WF_MultiChan_Dataset(Dataset):
         print(self.data.shape)
         self.root = root
         self.transform = transform
+        self.targets = np.array([[i for j in range(1200)] \
+                                for i in range(10)]).reshape(-1).astype('long')
+        self.target_transform = target_transform
 
     def __getitem__(self, index: int) -> Any :
         """
@@ -83,14 +95,17 @@ class WF_MultiChan_Dataset(Dataset):
             tensor: wf
         """
         wf = self.data[index].astype('float32')
-
+        y = self.targets[index].astype('long')
         # doing this so that it is a tensor
         # wf = torch.from_numpy(wf)
 
         if self.transform is not None:
             wf = self.transform(wf)
+        
+        if self.target_transform is not None:
+            y = self.target_transform(y)
 
-        return wf
+        return wf, y
 
 
     def __len__(self) -> int:
@@ -184,7 +199,7 @@ class ContrastiveLearningDataset:
                                               transforms.RandomApply([Jitter()], p=0.6),
                                             #   transforms.RandomApply([PCA_Reproj(root_folder=self.root_folder)], p=0.4),
                                               transforms.RandomApply([SmartNoise(self.root_folder, temporal_cov, spatial_cov, noise_scale)], p=0.5),
-                                            #   transforms.RandomApply([Collide(self.root_folder)], p=0.4),
+                                              transforms.RandomApply([Collide(self.root_folder)], p=0.4),
                                               ToWfTensor()])
         
         return data_transforms
@@ -207,14 +222,16 @@ class ContrastiveLearningDataset:
                                                                   spatial_cov_fn,
                                                                 #   noise_scale), self.get_pca_transform(self),
                                                                   noise_scale), None,
-                                                                  n_views)),
+                                                                  n_views),
+                                                              target_transform=LabelViewGenerator()),
                           'wfs_multichan': lambda: WF_MultiChan_Dataset(self.root_folder,
                                                               transform=ContrastiveLearningViewGenerator(
                                                                   self.get_wf_pipeline_transform(self, temp_cov_fn,
                                                                   spatial_cov_fn,
                                                                 #   noise_scale), self.get_pca_transform(self),
                                                                   noise_scale), None,
-                                                                  n_views)),
+                                                                  n_views),
+                                                              target_transform=LabelViewGenerator()),
                           'cifar10': lambda: datasets.CIFAR10(self.root_folder, train=True,
                                                               transform=ContrastiveLearningViewGenerator(
                                                                   self.get_simclr_pipeline_transform(32),
