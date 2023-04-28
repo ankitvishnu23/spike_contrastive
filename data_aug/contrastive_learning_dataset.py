@@ -9,7 +9,7 @@ from torchvision import transforms, datasets
 from torch.utils.data import Dataset
 from data_aug.view_generator import ContrastiveLearningViewGenerator
 from exceptions.exceptions import InvalidDatasetSelection
-from data_aug.wf_data_augs import AmpJitter, Jitter, Collide, SmartNoise, ToWfTensor, PCA_Reproj
+from data_aug.wf_data_augs import AmpJitter, Jitter, Collide, SmartNoise, ToWfTensor, PCA_Reproj, Crop
 from typing import Any, Callable, Optional, Tuple
 
 class WFDataset(Dataset):
@@ -175,16 +175,17 @@ class ContrastiveLearningDataset:
         return data_transforms
 
     @staticmethod
-    def get_wf_pipeline_transform(self, temp_cov_fn, spatial_cov_fn, noise_scale):
+    def get_wf_pipeline_transform(self, temp_cov_fn, spatial_cov_fn, noise_scale, num_extra_chans):
         temporal_cov = np.load(os.path.join(self.root_folder, temp_cov_fn))
         spatial_cov = np.load(os.path.join(self.root_folder, spatial_cov_fn))
         """Return a set of data augmentation transformations on waveforms."""
         data_transforms = transforms.Compose([
+                                            Crop(num_extra_chans=num_extra_chans),
                                             transforms.RandomApply([AmpJitter()], p=0.7),
                                               transforms.RandomApply([Jitter()], p=0.6),
                                             #   transforms.RandomApply([PCA_Reproj(root_folder=self.root_folder)], p=0.4),
                                               transforms.RandomApply([SmartNoise(self.root_folder, temporal_cov, spatial_cov, noise_scale)], p=0.5),
-                                            #   transforms.RandomApply([Collide(self.root_folder)], p=0.4),
+                                              transforms.RandomApply([Collide(self.root_folder)], p=0.4),
                                               ToWfTensor()])
         
         return data_transforms
@@ -206,14 +207,14 @@ class ContrastiveLearningDataset:
                                                                   self.get_wf_pipeline_transform(self, temp_cov_fn,
                                                                   spatial_cov_fn,
                                                                 #   noise_scale), self.get_pca_transform(self),
-                                                                  noise_scale), None,
+                                                                  noise_scale, 0), None,
                                                                   n_views)),
                           'wfs_multichan': lambda: WF_MultiChan_Dataset(self.root_folder,
                                                               transform=ContrastiveLearningViewGenerator(
                                                                   self.get_wf_pipeline_transform(self, temp_cov_fn,
                                                                   spatial_cov_fn,
                                                                 #   noise_scale), self.get_pca_transform(self),
-                                                                  noise_scale), None,
+                                                                  noise_scale, 2), None,
                                                                   n_views)),
                           'cifar10': lambda: datasets.CIFAR10(self.root_folder, train=True,
                                                               transform=ContrastiveLearningViewGenerator(

@@ -43,7 +43,8 @@ class AmpJitter(object):
             wf = np.expand_dims(wf, axis=0)
         n_chans = wf.shape[0]
         
-        amp_jit = np.random.uniform(self.lo, self.hi, n_chans)
+        amp_jit_value = np.random.uniform(self.lo, self.hi)
+        amp_jit = np.array([amp_jit_value for i in range(n_chans)])
 
         wf = wf * amp_jit[:, None]
     
@@ -113,12 +114,15 @@ class SmartNoise(object):
 
         the_noise = np.reshape(np.matmul(reshaped_noise, self.spatial_cov),
                         (waveform_length, n_neigh))
+        
+        noise_start = np.random.choice(n_neigh - n_chans)
 
-        noise_sel = np.random.choice(n_neigh, n_chans, replace=False)
-        noise_wfs = self.noise_scale * the_noise[:, noise_sel].T
+#         noise_sel = np.random.choice(n_neigh, n_chans, replace=False)
+        noise_wfs = self.noise_scale * the_noise[:, noise_start:noise_start+n_chans].T
         wf = wf + noise_wfs
 
         return wf
+
 
 class Collide(object):
     """Rescale the image in a sample to a given size.
@@ -227,8 +231,9 @@ class Jitter(object):
 
         shift = (2* np.random.binomial(1, 0.5)-1) * np.random.uniform(0, self.shift)
         
-        idx_selection = np.random.choice(self.up_factor, n_chans)
-        wf = up_shifted_temp[np.arange(n_chans), idx_selection]
+        idx_selection = np.random.choice(self.up_factor)
+        idxs = np.array([idx_selection for i in range(n_chans)])
+        wf = up_shifted_temp[np.arange(n_chans), idxs]
         wf = self.shift_chans(wf, shift)
 
         return wf
@@ -252,6 +257,32 @@ class Jitter(object):
 
         return wf_final
     
+
+class Crop(object):
+    def __init__(self, prob=0.5, num_extra_chans=2):
+        self.prob = prob
+        self.num_extra_chans = num_extra_chans
+        
+    def __call__(self, wf):
+        if len(wf.shape) == 1:
+            wf = np.expand_dims(wf, axis=0)
+        n_chans = wf.shape[0]
+        n_times = wf.shape[1]
+        
+        max_chan_ind = math.floor(n_chans/2)
+
+        apply = np.random.binomial(1, self.prob)
+        if apply:
+            shift = np.random.randint(-self.num_extra_chans, self.num_extra_chans+1)
+            max_chan_ind += shift
+
+        wf = wf[max_chan_ind-self.num_extra_chans:max_chan_ind+self.num_extra_chans+1]
+        # in single channel case the wf will become 1 dimensional
+        if len(wf.shape) == 1:
+            wf = np.expand_dims(wf, axis=0)
+
+        return wf
+
 
 class PCA_Reproj(object):
     """Rescale the image in a sample to a given size.
