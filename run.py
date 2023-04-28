@@ -68,7 +68,7 @@ def main_worker(gpu, args):
     # tr_dataset = WFDataset_lab(args.data, split='train')
     # te_dataset = WFDataset_lab(args.data, split='test')
     
-    dataset = ContrastiveLearningDataset(args.data, args.out_dim, multi_chan=args.multi_chan)
+    dataset = ContrastiveLearningDataset(args.data, args.out_dim, multi_chan=args.multi_chan, no_collide=args.no_collide)
 
     train_dataset = dataset.get_dataset(args.dataset_name, args.n_views, args.noise_scale)
     print("ddp:", args.ddp)
@@ -175,7 +175,7 @@ def make_sh_and_submit(args):
     import getpass
     username = getpass.getuser()
     preamble = (
-        f'#!/bin/sh\n#SBATCH --gres=gpu:volta:1\n#SBATCH --cpus-per-task=20\n#SBATCH '
+        f'#!/bin/sh\n#SBATCH --cpus-per-task=20\n#SBATCH --gres=gpu:volta:1\n#SBATCH '
         f'-o ./logs/{name}.out\n#SBATCH '
         f'--job-name={name}\n#SBATCH '
         f'--open-mode=append\n\n'
@@ -271,6 +271,8 @@ if __name__ == "__main__":
     parser.add_argument('--vocab_size', default=50304, type=int) # default to GPT-2 vocab size
     parser.add_argument('--online_head', action='store_true') # default = False
     parser.add_argument('--pos_enc', default ='seq_11times', type=str)    
+    parser.add_argument('--no_collide', action='store_true') # default = False
+    
     args = parser.parse_args()
     
     if args.submit:

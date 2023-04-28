@@ -113,7 +113,7 @@ class SimCLR(object):
             print('Epoch {}'.format(epoch_counter))
             time4 = time.time()
             for i, (wf, lab) in enumerate(train_loader):
-                print(f"batch {i}")
+                # print(f"batch {i}")
                 wf = torch.cat(wf, dim=0).float()
                 lab = torch.cat(lab, dim=0).long().cuda(self.gpu,non_blocking=True)
                 # wf = torch.squeeze(wf)
@@ -128,8 +128,8 @@ class SimCLR(object):
                         wf = torch.unsqueeze(wf, dim=-1)
                 wf = wf.cuda(self.gpu,non_blocking=True)
                 # wf = wf.float().cuda(self.args.device)
-                time1 = time.time()
-                print("time for loading batch:", time1 - time4)
+                # time1 = time.time()
+                # print("time for loading batch:", time1 - time4)
                 
                 with autocast(enabled=self.args.fp16):
                     if self.args.online_head:
@@ -141,14 +141,13 @@ class SimCLR(object):
                     if self.proj is not None:
                         raise "projector should be defined in model! "
                         features = self.proj(features)
-                    time2 = time.time()
-                    print("time for fwd:", time2-time1)
+                    # time2 = time.time()
+                    # print("time for fwd:", time2-time1)
                     
                     logits, labels = self.info_nce_loss(features)
                     loss = self.criterion(logits, labels) + cls_loss
-                    time3 = time.time()
-                    
-                    print("time for backward:", time3-time2)
+                    # time3 = time.time()
+                    # print("time for backward:", time3-time2)
                     
                 self.optimizer.zero_grad()
 
@@ -157,8 +156,8 @@ class SimCLR(object):
                 scaler.step(self.optimizer)
                 scaler.update()
                 
-                time4 = time.time()
-                print("time for optimizer step:", time4-time3)
+                # time4 = time.time()
+                # print("time for optimizer step:", time4-time3)
                 
                 # for i, param in enumerate(self.model.parameters()):
                 #     if i == 0:

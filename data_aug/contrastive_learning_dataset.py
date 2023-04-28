@@ -171,10 +171,11 @@ class WFDataset_lab(Dataset):
         return len(self.data)
 
 class ContrastiveLearningDataset:
-    def __init__(self, root_folder, lat_dim, multi_chan):
+    def __init__(self, root_folder, lat_dim, multi_chan, no_collide=False):
         self.root_folder = root_folder
         self.lat_dim = lat_dim
         self.multi_chan = multi_chan
+        self.no_collide = no_collide
     
 
     @staticmethod
@@ -190,11 +191,20 @@ class ContrastiveLearningDataset:
         return data_transforms
 
     @staticmethod
-    def get_wf_pipeline_transform(self, temp_cov_fn, spatial_cov_fn, noise_scale):
+    def get_wf_pipeline_transform(self, temp_cov_fn, spatial_cov_fn, noise_scale, no_collide=False):
         temporal_cov = np.load(os.path.join(self.root_folder, temp_cov_fn))
         spatial_cov = np.load(os.path.join(self.root_folder, spatial_cov_fn))
         """Return a set of data augmentation transformations on waveforms."""
-        data_transforms = transforms.Compose([
+        if no_collide:
+            data_transforms = transforms.Compose([
+                                            transforms.RandomApply([AmpJitter()], p=0.7),
+                                              transforms.RandomApply([Jitter()], p=0.6),
+                                            #   transforms.RandomApply([PCA_Reproj(root_folder=self.root_folder)], p=0.4),
+                                              transforms.RandomApply([SmartNoise(self.root_folder, temporal_cov, spatial_cov, noise_scale)], p=0.5),
+                                            #   transforms.RandomApply([Collide(self.root_folder)], p=0.4),
+                                              ToWfTensor()])
+        else:
+            data_transforms = transforms.Compose([
                                             transforms.RandomApply([AmpJitter()], p=0.7),
                                               transforms.RandomApply([Jitter()], p=0.6),
                                             #   transforms.RandomApply([PCA_Reproj(root_folder=self.root_folder)], p=0.4),
@@ -221,7 +231,7 @@ class ContrastiveLearningDataset:
                                                                   self.get_wf_pipeline_transform(self, temp_cov_fn,
                                                                   spatial_cov_fn,
                                                                 #   noise_scale), self.get_pca_transform(self),
-                                                                  noise_scale), None,
+                                                                  noise_scale, self.no_collide), None,
                                                                   n_views),
                                                               target_transform=LabelViewGenerator()),
                           'wfs_multichan': lambda: WF_MultiChan_Dataset(self.root_folder,
@@ -229,7 +239,7 @@ class ContrastiveLearningDataset:
                                                                   self.get_wf_pipeline_transform(self, temp_cov_fn,
                                                                   spatial_cov_fn,
                                                                 #   noise_scale), self.get_pca_transform(self),
-                                                                  noise_scale), None,
+                                                                  noise_scale, self.no_collide), None,
                                                                   n_views),
                                                               target_transform=LabelViewGenerator()),
                           'cifar10': lambda: datasets.CIFAR10(self.root_folder, train=True,
