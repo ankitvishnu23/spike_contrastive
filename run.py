@@ -67,10 +67,12 @@ def main_worker(gpu, args):
 
     tr_dataset = WFDataset_lab(args.data, split='train')
     te_dataset = WFDataset_lab(args.data, split='test')
+
+    num_extra_chans = args.num_extra_chans if args.multi_chan else 0
     
     dataset = ContrastiveLearningDataset(args.data, args.out_dim, multi_chan=args.multi_chan)
 
-    train_dataset = dataset.get_dataset(args.dataset_name, args.n_views, args.noise_scale)
+    train_dataset = dataset.get_dataset(args.dataset_name, args.n_views, args.noise_scale, num_extra_chans)
     print("ddp:", args.ddp)
     
     if args.ddp:
@@ -227,6 +229,7 @@ if __name__ == "__main__":
     parser.add_argument('--log-dir', default='./logs/', type=str) # can define type as PATH as well
     parser.add_argument('--ddp', action='store_true')
     parser.add_argument('--rank', default=0, type=int)
+    parser.add_argument('--num_extra_chans', default=0)
     
     args = parser.parse_args()
     

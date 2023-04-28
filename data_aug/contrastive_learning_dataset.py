@@ -15,6 +15,7 @@ from typing import Any, Callable, Optional, Tuple
 class WFDataset(Dataset):
     filename = "spikes_train.npy"
     multi_filename = "multichan_spikes_train.npy"
+    single_chan_mcs = "channel_num_train.npy"
 
     def __init__(
         self,
@@ -30,6 +31,7 @@ class WFDataset(Dataset):
         self.data = np.load(root + self.filename)
         print(self.data.shape)
         self.root = root
+        self.max_chans = np.load(root + self.single_chan_mcs)
         self.transform = transform
 
     def __getitem__(self, index: int) -> Any :
@@ -41,12 +43,13 @@ class WFDataset(Dataset):
             tensor: wf
         """
         wf = self.data[index].astype('float32')
+        mc = self.max_chans[index]
 
         # doing this so that it is a tensor
         # wf = torch.from_numpy(wf)
 
         if self.transform is not None:
-            wf = self.transform(wf)
+            wf = self.transform([wf, mc])
 
         return wf
 
@@ -57,6 +60,7 @@ class WFDataset(Dataset):
 
 class WF_MultiChan_Dataset(Dataset):
     filename = "multichan_spikes_train.npy"
+    multi_chan_mcs = "multichan_channel_num_train.npy"
 
     def __init__(
         self,
@@ -72,6 +76,7 @@ class WF_MultiChan_Dataset(Dataset):
         self.data = np.load(root + self.filename)
         print(self.data.shape)
         self.root = root
+        self.chan_nums = np.load(root + self.multi_chan_mcs)
         self.transform = transform
 
     def __getitem__(self, index: int) -> Any :
@@ -83,12 +88,13 @@ class WF_MultiChan_Dataset(Dataset):
             tensor: wf
         """
         wf = self.data[index].astype('float32')
+        chan_nums = self.chan_nums[index]
 
         # doing this so that it is a tensor
         # wf = torch.from_numpy(wf)
 
         if self.transform is not None:
-            wf = self.transform(wf)
+            wf = self.transform([wf, chan_nums])
 
         return wf
 
@@ -197,7 +203,7 @@ class ContrastiveLearningDataset:
         
         return data_transforms
 
-    def get_dataset(self, name, n_views, noise_scale=1.0):
+    def get_dataset(self, name, n_views, noise_scale=1.0, num_extra_chans=0):
         temp_cov_fn = 'temporal_cov_example.npy'    
         spatial_cov_fn = 'spatial_cov_example.npy'
         if self.multi_chan:
