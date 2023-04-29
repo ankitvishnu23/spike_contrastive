@@ -28,10 +28,10 @@ class WFDataset(Dataset):
         self.data: Any = []
 
         # now load the numpy array
-        self.data = np.load(root + self.filename)
+        self.data = np.load(os.path.join(root, self.filename))
         print(self.data.shape)
         self.root = root
-        self.max_chans = np.load(root + self.single_chan_mcs)
+        self.max_chans = np.load(os.path.join(root, self.single_chan_mcs))
         self.transform = transform
 
     def __getitem__(self, index: int) -> Any :
@@ -73,10 +73,10 @@ class WF_MultiChan_Dataset(Dataset):
         self.data: Any = []
 
         # now load the numpy array
-        self.data = np.load(root + self.filename)
+        self.data = np.load(os.path.join(root, self.filename))
         print(self.data.shape)
         self.root = root
-        self.chan_nums = np.load(root + self.multi_chan_mcs)
+        self.chan_nums = np.load(os.path.join(root, self.multi_chan_mcs))
         self.transform = transform
 
     def __getitem__(self, index: int) -> Any :
@@ -120,7 +120,7 @@ class WFDataset_lab(Dataset):
                 self.filename = "spikes_train.npy"
             else:
                 self.filename = "multichan_spikes_train.npy"
-            self.data = np.load(root + self.filename).astype('float32')
+            self.data = np.load(os.path.join(root, self.filename)).astype('float32')
             self.targets = np.array([[i for j in range(1200)] \
                                 for i in range(10)]).reshape(-1).astype('long')
         elif split == 'test':
@@ -128,7 +128,7 @@ class WFDataset_lab(Dataset):
                 self.filename = "spikes_test.npy"
             else:
                 self.filename = "multichan_spikes_test.npy"
-            self.data = np.load(root + self.filename).astype('float32')
+            self.data = np.load(os.path.join(root, self.filename)).astype('float32')
             self.targets = np.array([[i for j in range(300)] \
                                 for i in range(10)]).reshape(-1).astype('long')
             
