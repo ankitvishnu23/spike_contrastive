@@ -171,7 +171,6 @@ class Collide(object):
         n_chans = wf.shape[0]
         w = wf.shape[1]
         
-        print(self.templates)
         temp_idx = np.random.randint(0, len(self.templates))
         temp_sel = self.templates[temp_idx]
         temp_sel = np.expand_dims(temp_sel, axis=0) if len(temp_sel.shape) == 1 else temp_sel
