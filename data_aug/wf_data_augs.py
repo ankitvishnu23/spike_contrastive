@@ -128,7 +128,7 @@ class SmartNoise(object):
                         (waveform_length, n_neigh))
         
         # noise_start = np.random.choice(n_neigh - n_chans)
-        chan_nums[chan_nums > 383] = 383
+        chan_nums[chan_nums > n_neigh-1] = n_neigh - 1
         chan_nums[chan_nums < 0] = 0
 
 #         noise_sel = np.random.choice(n_neigh, n_chans, replace=False)
