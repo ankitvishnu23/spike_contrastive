@@ -107,7 +107,7 @@ class SimCLR(object):
 
                 wf = wf.double().to(self.gpu)
                 # wf = wf.float().cuda(self.args.device)
-                with autocast(dtype=self.args.fp16_precision, enabled=True):
+                with autocast(dtype=self.args.fp16_precision):
                     features = self.model(wf)
                     if self.proj is not None:
                         features = self.proj(features)
