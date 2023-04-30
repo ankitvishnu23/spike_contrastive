@@ -149,13 +149,14 @@ class Collide(object):
     root_folder = '/home/jovyan/nyu47-templates/'
     temp_name = 'spikes_train.npy'
 
-    def __init__(self, root_folder=None, templates=None, multichan=False):
+    def __init__(self, root_folder=None, templates=None, multi_chan=False):
+        temp_name = self.temp_name
         if root_folder is not None:
             self.root_folder = root_folder
-        if multichan:
+        if multi_chan:
             temp_name = 'multichan_' + temp_name
         if templates is None:
-            templates = np.load(os.path.join(self.root_folder, self.temp_name))
+            templates = np.load(os.path.join(self.root_folder, temp_name))
         # assert isinstance(templates, (array, array))
         self.templates = templates
 
@@ -169,7 +170,8 @@ class Collide(object):
             wf = np.expand_dims(wf, axis=0)
         n_chans = wf.shape[0]
         w = wf.shape[1]
-
+        
+        print(self.templates)
         temp_idx = np.random.randint(0, len(self.templates))
         temp_sel = self.templates[temp_idx]
         temp_sel = np.expand_dims(temp_sel, axis=0) if len(temp_sel.shape) == 1 else temp_sel
@@ -302,7 +304,6 @@ class Crop(object):
         if apply:
             shift = np.random.randint(-self.num_extra_chans, self.num_extra_chans+1)
             max_chan_ind += shift
-
         wf = wf[max_chan_ind-self.num_extra_chans:max_chan_ind+self.num_extra_chans+1]
         chan_nums = chan_nums[max_chan_ind-self.num_extra_chans:max_chan_ind+self.num_extra_chans+1]
         # in single channel case the wf will become 1 dimensional

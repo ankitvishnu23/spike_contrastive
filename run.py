@@ -51,7 +51,7 @@ def main(args):
     else:
         args.dist_url = f'tcp://localhost:{random.randrange(49152, 65535)}'
     # main_worker(0, args)
-    torch.multiprocessing.spawn(main_worker, (args,), args.world_size)
+    torch.multiprocessing.spawn(main_worker, (args,), torch.cuda.device_count())
     
 def main_worker(gpu, args):
     # args.rank += gpu
@@ -64,9 +64,6 @@ def main_worker(gpu, args):
     # torch.cuda.set_device(gpu)
     torch.backends.cudnn.benchmark = True
     # torch.backends.cudnn.deterministic = True
-
-    tr_dataset = WFDataset_lab(args.data, split='train')
-    te_dataset = WFDataset_lab(args.data, split='test')
 
     num_extra_chans = args.num_extra_chans if args.multi_chan else 0
     
@@ -230,8 +227,11 @@ if __name__ == "__main__":
     parser.add_argument('--ddp', action='store_true')
     parser.add_argument('--rank', default=0, type=int)
     parser.add_argument('--num_extra_chans', default=0)
+    parser.add_argument('--world_size', default=2, type=int)
     
     args = parser.parse_args()
+    
+    print("MULTICHAN", args.multi_chan)
     
     if args.submit:
         make_sh_and_submit(args)

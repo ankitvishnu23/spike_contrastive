@@ -120,6 +120,7 @@ class WFDataset_lab(Dataset):
                 self.filename = "spikes_train.npy"
             else:
                 self.filename = "multichan_spikes_train.npy"
+            print(multi_chan, self.filename)
             self.data = np.load(os.path.join(root, self.filename)).astype('float32')
             self.targets = np.array([[i for j in range(1200)] \
                                 for i in range(10)]).reshape(-1).astype('long')
@@ -191,7 +192,7 @@ class ContrastiveLearningDataset:
                                               transforms.RandomApply([Jitter()], p=0.6),
                                             #   transforms.RandomApply([PCA_Reproj(root_folder=self.root_folder)], p=0.4),
                                               transforms.RandomApply([SmartNoise(self.root_folder, temporal_cov, spatial_cov, noise_scale)], p=0.5),
-                                              transforms.RandomApply([Collide(self.root_folder)], p=0.4),
+                                              transforms.RandomApply([Collide(self.root_folder, multi_chan=self.multi_chan)], p=0.4),
                                               ToWfTensor()])
         
         return data_transforms
