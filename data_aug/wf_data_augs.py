@@ -304,6 +304,7 @@ class Crop(object):
             max_chan_ind += shift
 
         wf = wf[max_chan_ind-self.num_extra_chans:max_chan_ind+self.num_extra_chans+1]
+        chan_nums = chan_nums[max_chan_ind-self.num_extra_chans:max_chan_ind+self.num_extra_chans+1]
         # in single channel case the wf will become 1 dimensional
         if len(wf.shape) == 1:
             wf = np.expand_dims(wf, axis=0)
