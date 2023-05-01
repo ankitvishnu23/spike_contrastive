@@ -186,7 +186,7 @@ class SimCLR(object):
                 # self.writer.add_scalar('loss', loss, epoch_counter)
                 # self.writer.add_scalar('pca_knn_score', pca_score, global_step=n_iter)
                 # self.writer.add_scalar('knn_score', knn_score, epoch_counter)
-                # self.logger.log_value('knn_score', knn_score, epoch_counter)
+                self.logger.log_value('knn_score', knn_score, epoch_counter)
                 
                 curr_lr = self.optimizer.param_groups[0]['lr'] if self.scheduler == None else self.scheduler.get_lr()[0]
                 # self.writer.add_scalar('learning_rate', curr_lr, epoch_counter)

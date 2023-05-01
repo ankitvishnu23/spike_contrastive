@@ -189,13 +189,13 @@ python run.py --out_dim=5 --proj_dim=5 --batch-size=128 --lr=0.001 --arch=attent
 
 python run.py --out_dim=5 --proj_dim=5 --batch-size=128 --lr=0.001 --arch=attention --epochs=800 --fp16 --use_gpt --is_causal --n_embd=32 --exp=gpt_testallaug
 
-for bs in 128
+for bs in 128 512
 do
 for lr in 0.001 
 do
 for nembd in 32 64
 do
-python run.py --add_prefix=0427 --submit --arg_str="--out_dim=5 --proj_dim=5 --batch-size=${bs} --lr=${lr} --arch=attention --epochs=800 --fp16 --use_gpt --is_causal --n_embd=${nembd} "
+python run.py --add_prefix=0428 --submit --arg_str="--out_dim=5 --proj_dim=5 --batch-size=${bs} --lr=${lr} --arch=attention --epochs=800 --fp16 --use_gpt --is_causal --n_embd=${nembd} "
 done
 done
 done
