@@ -90,6 +90,131 @@ for bs in 64 128 256 512
 do
 for lr in 0.001 
 do
-python run.py --submit --arg_str="--out_dim=5 --proj_dim=5 --batch-size=${bs} --lr=${lr} --arch=attention --epochs=800 "
+python run.py --add_prefix=0405 --submit --arg_str="--out_dim=5 --proj_dim=5 --batch-size=${bs} --lr=${lr} --arch=attention --epochs=800 "
 done
 done
+
+for bs in 64 128 256 512
+do
+for lr in 0.001 
+do
+python run.py --add_prefix=0405single --submit --arg_str="--out_dim=5 --proj_dim=5 --batch-size=${bs} --lr=${lr} --arch=attention --epochs=800 "
+done
+done
+
+
+python run.py --out_dim=5 --proj_dim=5 --batch-size=512 --lr=0.01 --arch=attention --epochs=800
+
+
+for bs in 64 128 256 512
+do
+for lr in 0.001 
+do
+python run.py --add_prefix=0410 --submit --arg_str="--out_dim=5 --proj_dim=5 --batch-size=${bs} --lr=${lr} --arch=attention --epochs=800 "
+done
+done
+
+python run.py --out_dim=5 --proj_dim=5 --batch-size=512 --lr=0.001 --arch=attention --epochs=800 --exp=test1 
+--fp16
+
+python run.py --out_dim=5 --proj_dim=5 --batch-size=5120 --lr=0.001 --arch=attention --epochs=800 --exp=test2 --fp16 --use_gpt
+
+
+for bs in 512
+do
+for lr in 0.001 0.01 0.0001
+do
+python run.py --add_prefix=0415 --submit --arg_str="--out_dim=5 --proj_dim=5 --batch-size=${bs} --lr=${lr} --arch=attention --epochs=800 --fp16 --use_gpt "
+done
+done
+
+for bs in 512
+do
+for lr in 0.001 0.01 0.0001 
+do
+python run.py --add_prefix=0415 --submit --arg_str="--out_dim=5 --proj_dim=5 --batch-size=${bs} --lr=${lr} --arch=attention --epochs=800 --fp16 --use_gpt --is_causal "
+done
+done
+
+for bs in 512
+do
+for lr in 0.001 0.01 0.0001
+do
+python run.py --add_prefix=0416 --submit --arg_str="--out_dim=5 --proj_dim=5 --batch-size=${bs} --lr=${lr} --arch=attention --epochs=800 --fp16 --use_gpt --n_embd=32 "
+done
+done
+
+for bs in 512
+do
+for lr in 0.001 0.01 0.0001 
+do
+python run.py --add_prefix=0416 --submit --arg_str="--out_dim=5 --proj_dim=5 --batch-size=${bs} --lr=${lr} --arch=attention --epochs=800 --fp16 --use_gpt --is_causal --n_embd=32 "
+done
+done
+
+for bs in 128
+do
+for lr in 0.001 0.01 0.0001
+do
+python run.py --add_prefix=0418 --submit --arg_str="--out_dim=5 --proj_dim=5 --batch-size=${bs} --lr=${lr} --arch=attention --epochs=800 --fp16 --use_gpt "
+done
+done
+
+for bs in 128
+do
+for lr in 0.001 0.01 0.0001 
+do
+python run.py --add_prefix=0416 --submit --arg_str="--out_dim=5 --proj_dim=5 --batch-size=${bs} --lr=${lr} --arch=attention --epochs=800 --fp16 --use_gpt --is_causal "
+done
+done
+
+for bs in 128
+do
+for lr in 0.001 0.01 0.0001
+do
+python run.py --add_prefix=0416 --submit --arg_str="--out_dim=5 --proj_dim=5 --batch-size=${bs} --lr=${lr} --arch=attention --epochs=800 --fp16 --use_gpt --n_embd=32 "
+done
+done
+
+for bs in 128
+do
+for lr in 0.001 0.01 0.0001 
+do
+python run.py --add_prefix=0418 --submit --arg_str="--out_dim=5 --proj_dim=5 --batch-size=${bs} --lr=${lr} --arch=attention --epochs=800 --fp16 --use_gpt --is_causal --n_embd=32 "
+done
+done
+
+
+python run.py --out_dim=5 --proj_dim=5 --batch-size=128 --lr=0.001 --arch=attention --epochs=800 --exp=gpt_test22 --fp16 --use_gpt --n_embd=32
+
+python run.py --out_dim=5 --proj_dim=5 --batch-size=128 --lr=0.001 --arch=attention --epochs=800 --fp16 --use_gpt --is_causal --n_embd=32 --exp=gpt_testallaug
+
+for bs in 128 512
+do
+for lr in 0.001 
+do
+for nembd in 32 64
+do
+python run.py --add_prefix=0428 --submit --arg_str="--out_dim=5 --proj_dim=5 --batch-size=${bs} --lr=${lr} --arch=attention --epochs=800 --fp16 --use_gpt --is_causal --n_embd=${nembd} "
+done
+done
+done
+
+
+for bs in 512
+do
+for lr in 0.001 
+do
+for nembd in 32 64
+do
+python run.py --add_prefix=0427 --submit --arg_str="--no_collide --out_dim=5 --proj_dim=5 --batch-size=${bs} --lr=${lr} --arch=attention --epochs=800 --fp16 --use_gpt --is_causal --n_embd=${nembd} "
+done
+done
+done
+
+python run.py --out_dim=5 --proj_dim=5 --batch-size=128 --lr=0.001 --arch=attention --epochs=800 --fp16 --use_gpt --is_causal --n_embd=32 --exp=gpt_noccollide --no_collide
+
+python run.py --out_dim=5 --proj_dim=5 --batch-size=128 --lr=0.001 --arch=attention --epochs=800 --fp16 --use_gpt --is_causal --n_embd=32 --exp=gpt_bs128_lr0.001_n32
+
+python run.py --out_dim=5 --proj_dim=5 --batch-size=128 --lr=0.001 --arch=attention --epochs=800 --fp16 --use_gpt --is_causal --n_embd=64 --exp=gpt_bs128_lr0.001_n64
+

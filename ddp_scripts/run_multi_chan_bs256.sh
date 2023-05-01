@@ -26,7 +26,7 @@ python \
       --log-dir $HOME2/scratch/spike_contrastive/logs/ \
       --nodes 2 \
       --ngpus-per-node 4 \
-      --exp mc_out5proj5_bs256_ep800_lr${lr}
+      --exp mc4_out5proj5_bs256_ep800_lr${lr}
 done
 echo "Run completed at:- "
 date

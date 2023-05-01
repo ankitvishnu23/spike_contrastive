@@ -12,6 +12,8 @@ from torchvision import models
 from data_aug.contrastive_learning_dataset import ContrastiveLearningDataset, WFDataset_lab
 from models.model_simclr import ModelSimCLR, Projector, Projector2
 from simclr import SimCLR
+from models.model_GPT import GPTConfig, GPT
+from torch.nn.parallel import DistributedDataParallel as DDP
 
 
 # def main(args):
@@ -43,15 +45,14 @@ from simclr import SimCLR
 # the above does not allow for one-node one-gpu training. (device_count would count all gpus on the node but doesnt mean these are allocated)
 # consider reinstating the above if single-node multi-gpu training is needed
 def main(args):
-    if 'SLURM_JOB_ID' in os.environ:
-        cmd = 'scontrol show hostnames ' + os.getenv('SLURM_JOB_NODELIST')
-        stdout = subprocess.check_output(cmd.split())
-        host_name = stdout.decode().splitlines()[0]
-        args.dist_url = f'tcp://{host_name}:58478'
-    else:
-        args.dist_url = f'tcp://localhost:{random.randrange(49152, 65535)}'
-    # main_worker(0, args)
-    torch.multiprocessing.spawn(main_worker, (args,), torch.cuda.device_count())
+    print("starting main loop")
+    args.checkpoint_dir = os.path.join(args.checkpoint_dir, args.exp)
+    args.log_dir = os.path.join(args.log_dir, args.exp)
+    
+    os.makedirs(args.checkpoint_dir, exist_ok=True)
+    os.makedirs(args.log_dir, exist_ok=True)
+    
+    main_worker(0, args)
     
 def main_worker(gpu, args):
     # args.rank += gpu
@@ -65,6 +66,9 @@ def main_worker(gpu, args):
     torch.backends.cudnn.benchmark = True
     # torch.backends.cudnn.deterministic = True
 
+    # tr_dataset = WFDataset_lab(args.data, split='train')
+    # te_dataset = WFDataset_lab(args.data, split='test')
+    
     num_extra_chans = args.num_extra_chans if args.multi_chan else 0
     
     dataset = ContrastiveLearningDataset(args.data, args.out_dim, multi_chan=args.multi_chan)
@@ -88,18 +92,29 @@ def main_worker(gpu, args):
             num_workers=args.workers, pin_memory=True, drop_last=True)
 
     # define memory and test dataset for knn monitoring
-    memory_dataset = WFDataset_lab(args.data, split='train', multi_chan=args.multi_chan)
-    memory_loader = torch.utils.data.DataLoader(
-        memory_dataset, batch_size=args.batch_size, shuffle=False,
-        num_workers=args.workers, pin_memory=True, drop_last=False)
-    
-    test_dataset = WFDataset_lab(args.data, split='test', multi_chan=args.multi_chan)
-    test_loader = torch.utils.data.DataLoader(
-        test_dataset, batch_size=args.batch_size, shuffle=False,
-        num_workers=args.workers, pin_memory=True, drop_last=False)
-    
-    model = ModelSimCLR(base_model=args.arch, out_dim=args.out_dim, proj_dim=args.proj_dim, \
-        fc_depth=args.fc_depth, expand_dim=args.expand_dim, multichan=args.multi_chan)
+    if not args.ddp:
+        memory_dataset = WFDataset_lab(args.data, split='train', multi_chan=args.multi_chan)
+        memory_loader = torch.utils.data.DataLoader(
+            memory_dataset, batch_size=args.batch_size, shuffle=False,
+            num_workers=args.workers, pin_memory=True, drop_last=False)
+        
+        test_dataset = WFDataset_lab(args.data, split='test', multi_chan=args.multi_chan)
+        test_loader = torch.utils.data.DataLoader(
+            test_dataset, batch_size=args.batch_size, shuffle=False,
+            num_workers=args.workers, pin_memory=True, drop_last=False)
+    else:
+        memory_loader = None
+        test_loader = None
+           
+    if args.use_gpt:
+        model_args = dict(n_layer=args.n_layer, n_head=args.n_head, n_embd=args.n_embd, block_size=args.block_size,
+                  bias=args.bias, vocab_size=args.vocab_size, dropout=args.dropout, out_dim=args.out_dim, is_causal=args.is_causal, 
+                  proj_dim=args.proj_dim, pos=args.pos_enc, multi_chan=args.multi_chan) 
+        gptconf = GPTConfig(**model_args)
+        model = GPT(gptconf).cuda(gpu)
+    else:
+        model = ModelSimCLR(base_model=args.arch, out_dim=args.out_dim, proj_dim=args.proj_dim, \
+            fc_depth=args.fc_depth, expand_dim=args.expand_dim, multichan=args.multi_chan).cuda(gpu)
 
     if not args.no_proj:
         if args.arch == 'custom_encoder':
@@ -110,6 +125,20 @@ def main_worker(gpu, args):
             proj = Projector(rep_dim=args.out_dim, proj_dim=args.proj_dim)
     else:
         proj = None
+    
+    # for n, p in model.named_parameters():
+    #     print(n, p.numel())
+    # print("number of encoder params: ", sum(p.numel() for p in self.backbone.parameters()))
+    print("number of transfomer params: ", sum(p.numel() for n,p in model.named_parameters() if 'transformer' in n))
+    print("number of fcpart params: ", sum(p.numel() for n,p in model.named_parameters() if ('lm_head' in n and 'proj' not in n)))
+    print("number of Proj params: ", sum(p.numel() for n,p in model.named_parameters() if ('proj' in n)))
+    print("number of online classifier params: ", sum(p.numel() for n,p in model.named_parameters() if 'online_head' in n))
+    
+    # moved this out from simclr.py since model needs to be pushed to gpu before defining optimizers else loading optimizer dict will be an issue
+    if args.ddp:
+        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+        model = DDP(model, device_ids=[gpu])
+        
     if args.optimizer == 'adam':
         optimizer = torch.optim.Adam(model.parameters(), args.lr, weight_decay=args.weight_decay)
         scheduler = None
@@ -118,8 +147,10 @@ def main_worker(gpu, args):
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=(args.epochs * len(train_loader)), eta_min=0,
                                                            last_epoch=-1)
 
+    print("model and optimizer initialized!")
         # automatically resume from checkpoint if it exists
     if os.path.exists(os.path.join(args.checkpoint_dir, "checkpoint.pth")):
+        print("loading from previous checkpoint: ", args.checkpoint_dir)
         ckpt = torch.load(os.path.join(args.checkpoint_dir, "checkpoint.pth"),
                           map_location='cpu')
         start_epoch = ckpt['epoch']
@@ -131,10 +162,11 @@ def main_worker(gpu, args):
         
     #  It’s a no-op if the 'gpu_index' argument is a negative integer or None.
     # with torch.cuda.device(args.gpu_index):
+    print("starting SimCLR..")
+    
     simclr = SimCLR(model=model, proj=proj, optimizer=optimizer, scheduler=scheduler, gpu=gpu, 
                     sampler=sampler, args=args, start_epoch=start_epoch)
     simclr.train(train_loader, memory_loader, test_loader)
-    torch.distributed.destroy_process_group()
 
 def make_sh_and_submit(args):
     os.makedirs('./scripts/', exist_ok=True)
@@ -146,7 +178,7 @@ def make_sh_and_submit(args):
     import getpass
     username = getpass.getuser()
     preamble = (
-        f'#!/bin/sh\n#SBATCH --gres=gpu:volta:1\n#SBATCH --cpus-per-task=20\n#SBATCH '
+        f'#!/bin/sh\n#SBATCH --cpus-per-task=20\n#SBATCH --gres=gpu:volta:1\n#SBATCH '
         f'-o ./logs/{name}.out\n#SBATCH '
         f'--job-name={name}\n#SBATCH '
         f'--open-mode=append\n\n'
@@ -171,7 +203,7 @@ def make_sh_and_submit(args):
 if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='PyTorch SimCLR')
-    parser.add_argument('--data', metavar='DIR', default='/home/gridsan/cloh/spike_contrastive/dy016/',
+    parser.add_argument('--data', metavar='DIR', default='/home/gridsan/cloh/spike_contrastive/datasets/single_dy016_random_neurons_04_28_2023/',
                         help='path to dataset')
     parser.add_argument('-dataset-name', default='wfs',
                         help='dataset name', choices=['wfs', 'stl10', 'cifar10'])
@@ -182,7 +214,7 @@ if __name__ == "__main__":
     parser.add_argument('-ns', '--noise_scale', default=1.0,
                         help='how much to scale the noise augmentation (default: 1)')
     parser.add_argument('-j', '--workers', default=12, type=int, metavar='N',
-                        help='number of data loading workers (default: 12)')
+                        help='number of data loading workers (default: 32)')
     parser.add_argument('--epochs', default=300, type=int, metavar='N',
                         help='number of total epochs to run')
     parser.add_argument('-b', '--batch-size', default=1024, type=int,
@@ -199,7 +231,7 @@ if __name__ == "__main__":
                         help='seed for initializing training. ')
     parser.add_argument('--disable-cuda', action='store_true',
                         help='Disable CUDA')
-    parser.add_argument('--fp16-precision', action='store_true',
+    parser.add_argument('--fp16', action='store_true',
                         help='Whether or not to use 16-bit precision GPU training.')
     parser.add_argument('--out_dim', default=5, type=int,
                         help='feature dimension (default: 2)')
@@ -226,8 +258,25 @@ if __name__ == "__main__":
     parser.add_argument('--log-dir', default='./logs/', type=str) # can define type as PATH as well
     parser.add_argument('--ddp', action='store_true')
     parser.add_argument('--rank', default=0, type=int)
-    parser.add_argument('--num_extra_chans', default=0)
     parser.add_argument('--world_size', default=2, type=int)
+    parser.add_argument('--eval_knn_every_n_epochs', default=1, type=int)
+    
+    parser.add_argument('--use_gpt', action='store_true') # default = False
+    
+    parser.add_argument('--n_layer', default=20, type=int)
+    parser.add_argument('--n_head', default=4, type=int)
+    parser.add_argument('--n_embd', default=64, type=int)
+    parser.add_argument('--is_causal', action='store_true') # default = False
+    # parser.add_argument('--block_size', default=2678, type=int) # this is the max sequence length
+    parser.add_argument('--block_size', default=121, type=int) # this is the max sequence length
+    
+    parser.add_argument('--dropout', default=0.2, type=float)
+    parser.add_argument('--bias', action='store_true') # default = False
+    parser.add_argument('--vocab_size', default=50304, type=int) # default to GPT-2 vocab size
+    parser.add_argument('--online_head', action='store_true') # default = False
+    parser.add_argument('--pos_enc', default ='seq_11times', type=str)    
+    parser.add_argument('--no_collide', action='store_true') # default = False
+    parser.add_argument('--num_extra_chans', default=0, type=int)
     
     args = parser.parse_args()
     

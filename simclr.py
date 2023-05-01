@@ -18,7 +18,7 @@ from utils import (
 )
 import tensorboard_logger as tb_logger
 torch.manual_seed(0)
-
+import time
 
 class SimCLR(object):
 
@@ -27,12 +27,13 @@ class SimCLR(object):
         self.gpu = kwargs['gpu']
         self.sampler = kwargs['sampler']
         # self.model = kwargs['model'].double().cuda(self.args.device)
-        self.model = kwargs['model'].to(self.gpu)
-        if self.args.ddp:
-            self.model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(self.model)
-            self.model = DDP(self.model, device_ids=[self.gpu], find_unused_parameters=True)
+        # self.model = kwargs['model'].double().to(self.gpu)
+        
+        self.model =  kwargs['model']
         # self.model = kwargs['model'].cuda(self.args.device)
-        self.proj = kwargs['proj'].to(kwargs['gpu']) if kwargs['proj'] is not None else None
+        self.proj = kwargs['proj'].cuda(kwargs['gpu']) if kwargs['proj'] is not None else None 
+        if self.proj and self.args.ddp:
+            raise "proj needs to be wrapped in ddp"
         self.optimizer = kwargs['optimizer']
         self.scheduler = kwargs['scheduler']
         # self.writer = SummaryWriter('./logs/'+self.args.exp)
@@ -55,7 +56,8 @@ class SimCLR(object):
 
         labels = torch.cat([torch.arange(batch_dim) for i in range(self.args.n_views)], dim=0)
         labels = (labels.unsqueeze(0) == labels.unsqueeze(1)).float()
-        labels = labels.to(self.gpu)
+        # labels = labels.to(self.gpu)
+        labels = labels.cuda()
 
         similarity_matrix = torch.matmul(features, features.T)
         # assert similarity_matrix.shape == (
@@ -63,7 +65,8 @@ class SimCLR(object):
         # assert similarity_matrix.shape == labels.shape
 
         # discard the main diagonal from both: labels and similarities matrix
-        mask = torch.eye(labels.shape[0], dtype=torch.bool).to(self.gpu)
+        # mask = torch.eye(labels.shape[0], dtype=torch.bool).to(self.gpu)
+        mask = torch.eye(labels.shape[0], dtype=torch.bool).cuda(non_blocking=True)
         labels = labels[~mask].view(labels.shape[0], -1)
         similarity_matrix = similarity_matrix[~mask].view(similarity_matrix.shape[0], -1)
         # assert similarity_matrix.shape == labels.shape
@@ -75,14 +78,15 @@ class SimCLR(object):
         negatives = similarity_matrix[~labels.bool()].view(similarity_matrix.shape[0], -1)
 
         logits = torch.cat([positives, negatives], dim=1)
-        labels = torch.zeros(logits.shape[0], dtype=torch.long).to(self.gpu)
+        # labels = torch.zeros(logits.shape[0], dtype=torch.long).to(self.gpu)
+        labels = torch.zeros(logits.shape[0], dtype=torch.long).cuda()
 
         logits = logits / self.args.temperature
         return logits, labels
 
     def train(self, train_loader, memory_loader=None, test_loader=None):
 
-        scaler = GradScaler(enabled=self.args.fp16_precision)
+        scaler = GradScaler(enabled=self.args.fp16)
 
         # save config file
         # save_config_file('./runs-args', self.args)
@@ -91,50 +95,85 @@ class SimCLR(object):
         if self.args.rank == 0 or not self.args.ddp:
             logging.info(f"Start SimCLR training for {self.args.epochs} epochs.")
             logging.info(f"Training with gpu: {not self.args.disable_cuda}.")
+            print(f"Start SimCLR training for {self.args.epochs} epochs, starting at {self.start_epoch}.")
 
         # pca_score = knn_pca_score(self.args.out_dim, self.args.data)
         pca_score = 0
 
         for epoch_counter in range(self.start_epoch, self.args.epochs):
+            start_time = time.time()
             if self.args.ddp:
                 self.sampler.set_epoch(epoch_counter)
             print('Epoch {}'.format(epoch_counter))
-            for wf in tqdm(train_loader):
-                wf = torch.cat(wf, dim=0)
+            time4 = time.time()
+            for i, (wf, lab) in enumerate(train_loader):
+                # print(f"batch {i}")
+                wf = torch.cat(wf, dim=0).float()
+                lab = torch.cat(lab, dim=0).long().cuda(self.gpu,non_blocking=True)
                 # wf = torch.squeeze(wf)
                 # if not self.multichan:
                 #     wf = torch.unsqueeze(wf, dim=1)
-
-                wf = wf.double().to(self.gpu)
+                if self.args.use_gpt:
+                    if not self.args.multi_chan:
+                        wf = torch.squeeze(wf, dim=1)
+                        wf = torch.unsqueeze(wf, dim=-1)
+                    else:
+                        wf = wf.view(-1, 11*121)
+                        wf = torch.unsqueeze(wf, dim=-1)
+                wf = wf.cuda(self.gpu,non_blocking=True)
                 # wf = wf.float().cuda(self.args.device)
-                with autocast(enabled=self.args.fp16_precision):
-                    features = self.model(wf)
+                # time1 = time.time()
+                # print("time for loading batch:", time1 - time4)
+                
+                with autocast(enabled=self.args.fp16):
+                    if self.args.online_head:
+                        features, cls_loss, online_acc = self.model(wf, lab)
+                    else:  
+                        features = self.model(wf)
+                        cls_loss = 0.
+                        online_acc = -1
                     if self.proj is not None:
+                        raise "projector should be defined in model! "
                         features = self.proj(features)
+                    # time2 = time.time()
+                    # print("time for fwd:", time2-time1)
+                    
                     logits, labels = self.info_nce_loss(features)
-                    loss = self.criterion(logits, labels)
-
+                    loss = self.criterion(logits, labels) + cls_loss
+                    # time3 = time.time()
+                    # print("time for backward:", time3-time2)
+                    
                 self.optimizer.zero_grad()
 
                 scaler.scale(loss).backward()
 
                 scaler.step(self.optimizer)
                 scaler.update()
-
+                
+                # time4 = time.time()
+                # print("time for optimizer step:", time4-time3)
+                
+                # for i, param in enumerate(self.model.parameters()):
+                #     if i == 0:
+                #         print(param.dtype)
                 # knn_score = knn_monitor(net=self.model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True)
                 # if n_iter % 10 == 0:
-                #     knn_score = knn_monitor(net=self.model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True)
-                #     print(f"loss: {loss}, knn_acc:{knn_score}")
-                if n_iter % self.args.log_every_n_steps == 0:
-                    if self.args.rank == 0 or not self.args.ddp:
-                        knn_score = validation(self.model, self.args.out_dim, self.args.data, self.gpu)
-                        print(f"loss: {loss}, knn_acc:{knn_score}")
-                    
+                
+                # if n_iter % self.args.log_every_n_steps == 0:
+                
                 n_iter += 1
 
                 # warmup for the first 10 epochs
                 if epoch_counter >= 10 and self.scheduler != None:
                     self.scheduler.step()   
+            
+            if epoch_counter % self.args.eval_knn_every_n_epochs == 0 and epoch_counter != 0:
+                if self.args.rank == 0 or not self.args.ddp:
+                    # knn_score = validation(self.model, self.args.out_dim, self.args.data, self.gpu)
+                    # print(f"loss: {loss}, knn_acc:{knn_score}")
+                    knn_score = knn_monitor(net=self.model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True, args=self.args)
+                    print(f"loss: {loss}, my knn_acc:{knn_score}")
+                    self.logger.log_value('knn_score', knn_score, epoch_counter)
                     
             if self.args.rank == 0 or not self.args.ddp:
                 logging.debug(f"Epoch: {epoch_counter}\tLoss: {loss}")
@@ -142,11 +181,27 @@ class SimCLR(object):
                 # self.writer.add_scalar('loss', loss, epoch_counter)
                 # self.writer.add_scalar('pca_knn_score', pca_score, global_step=n_iter)
                 # self.writer.add_scalar('knn_score', knn_score, epoch_counter)
-                self.logger.log_value('knn_score', knn_score, epoch_counter)
                 
                 curr_lr = self.optimizer.param_groups[0]['lr'] if self.scheduler == None else self.scheduler.get_lr()[0]
                 # self.writer.add_scalar('learning_rate', curr_lr, epoch_counter)
                 self.logger.log_value('learning_rate', curr_lr, epoch_counter)
+                if online_acc != -1:
+                    self.logger.log_value('online_acc', online_acc, epoch_counter)
+                    print("loss: ", loss.item(), "online acc: ", online_acc)
+            
+            print(f"time for epoch {epoch_counter}: {time.time()-start_time}")
+            if self.args.rank == 0 or not self.args.ddp:
+                # save model checkpoints
+                save_dict = {
+                    'epoch': epoch_counter,
+                    'arch': self.args.arch,
+                    'optimizer': self.optimizer.state_dict(),
+                    'state_dict': self.model.state_dict()
+                    }
+                    
+                save_checkpoint(save_dict, is_best=False, filename=os.path.join(self.args.checkpoint_dir, 'checkpoint.pth'))
+                print(f"Model checkpoint and metadata has been saved at {self.args.checkpoint_dir}.")
+                logging.info(f"Model checkpoint and metadata has been saved at {self.args.checkpoint_dir}.")
 
         if self.args.rank == 0 or not self.args.ddp:
             logging.info("Training has finished.")
@@ -157,6 +212,6 @@ class SimCLR(object):
                 'arch': self.args.arch,
                 'state_dict': self.model.state_dict(),
                 'optimizer': self.optimizer.state_dict(),
-            }, is_best=False, filename=os.path.join(self.args.checkpoint_dir, 'checkpoint.pth'))
+            }, is_best=False, filename=os.path.join(self.args.checkpoint_dir, 'final.pth'))
             # }, is_best=False, filename=os.path.join('./runs', checkpoint_name))
             logging.info(f"Model checkpoint and metadata has been saved at {self.args.checkpoint_dir}.")
