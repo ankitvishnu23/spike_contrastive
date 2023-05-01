@@ -8,7 +8,7 @@ from data_aug.gaussian_blur import GaussianBlur
 from torchvision import transforms, datasets
 from torch.utils.data import Dataset
 from data_aug.view_generator import ContrastiveLearningViewGenerator, LabelViewGenerator
-from exceptions.exceptions import InvalidDatasetSelection
+# from exceptions.exceptions import InvalidDatasetSelection
 from data_aug.wf_data_augs import AmpJitter, Jitter, Collide, SmartNoise, ToWfTensor, PCA_Reproj, Crop
 from typing import Any, Callable, Optional, Tuple
 
@@ -253,6 +253,6 @@ class ContrastiveLearningDataset:
         try:
             dataset_fn = valid_datasets[name]
         except KeyError:
-            raise InvalidDatasetSelection()
+            raise ValueError(f'Dataset {name} not supported or not existent')
         else:
             return dataset_fn()

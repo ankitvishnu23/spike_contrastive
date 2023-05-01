@@ -1,56 +1,25 @@
-import argparse
-import numpy as np
-import os 
+import logging
+import os
 import sys
-import subprocess
-import random
-
+from pathlib import Path
 import torch
-import torch.backends.cudnn as cudnn
-
-from torchvision import models
+import torch.nn.functional as F
+import torch.multiprocessing as mp
+import torch.distributed as dist
+from utils import knn_monitor
 from data_aug.contrastive_learning_dataset import ContrastiveLearningDataset, WFDataset_lab
-from models.model_simclr import ModelSimCLR, Projector, Projector2
-from simclr import SimCLR
-from models.model_GPT import GPTConfig, GPT
-from torch.nn.parallel import DistributedDataParallel as DDP
+from main import SimCLR
+from datasets import build_dataset
+import argparse
+import torch.nn.functional as F
 
-
-# def main(args):
-#     assert args.n_views == 2, "Only two view training is supported. Please use --n-views 2."
-#     # check if gpu training is available
-#     args.ngpus_per_node = torch.cuda.device_count()
-#     assert args.ngpus_per_node > 0, "Only GPU training is currently supported. Please run with at least 1 GPU."
-#     if 'SLURM_JOB_ID' in os.environ:
-#         cmd = 'scontrol show hostnames ' + os.getenv('SLURM_JOB_NODELIST')
-#         stdout = subprocess.check_output(cmd.split())
-#         host_name = stdout.decode().splitlines()[0]
-#         args.rank = int(os.getenv('SLURM_NODEID')) * args.ngpus_per_node
-#         args.world_size = int(os.getenv('SLURM_NNODES')) * args.ngpus_per_node
-#         args.dist_url = f'tcp://{host_name}:58478'
-#     elif not args.disable_cuda and args.multi_chan:
-#         # single-node distributed training
-#         args.rank = 0
-#         args.world_size = args.ngpus_per_node
-#         args.dist_url = f'tcp://localhost:{random.randrange(49152, 65535)}'
-#     # elif not args.disable_cuda and torch.cuda.is_available():
-#         # args.device = torch.device('cuda')
-#         cudnn.deterministic = True
-#         cudnn.benchmark = True
-#     # else:
-#     #     args.device = torch.device('cpu')
-#     #     args.gpu_index = -1
-#     torch.multiprocessing.spawn(main_worker, (args,), args.ngpus_per_node)
-
-# the above does not allow for one-node one-gpu training. (device_count would count all gpus on the node but doesnt mean these are allocated)
-# consider reinstating the above if single-node multi-gpu training is needed
 def main(args):
-    print("starting main loop")
-    args.checkpoint_dir = os.path.join(args.checkpoint_dir, args.exp)
-    args.log_dir = os.path.join(args.log_dir, args.exp)
+    print("starting knn eval")
+    # args.checkpoint_dir = os.path.join(args.checkpoint_dir, args.exp)
+    # args.log_dir = os.path.join(args.log_dir, args.exp)
     
-    os.makedirs(args.checkpoint_dir, exist_ok=True)
-    os.makedirs(args.log_dir, exist_ok=True)
+    # os.makedirs(args.checkpoint_dir, exist_ok=True)
+    # os.makedirs(args.log_dir, exist_ok=True)
     
     main_worker(0, args)
     
@@ -58,36 +27,22 @@ def main_worker(gpu, args):
     # args.rank += gpu
     
     if args.ddp:
-        torch.distributed.init_process_group(
-            backend='nccl', init_method=args.dist_url,
-            world_size=args.world_size, rank=args.rank)
+        raise NotImplementedError("DDP not implemented")
     
     torch.cuda.set_device(gpu)
     torch.backends.cudnn.benchmark = True
 
-    # tr_dataset = WFDataset_lab(args.data, split='train')
-    # te_dataset = WFDataset_lab(args.data, split='test')
-    num_extra_chans = args.num_extra_chans if args.multi_chan else 0
-    
+
+    # dataset = ContrastiveLearningDataset(args.data, args.out_dim, multi_chan=args.multi_chan, no_collide=args.no_collide)
     dataset = ContrastiveLearningDataset(args.data, args.out_dim, multi_chan=args.multi_chan)
 
-    train_dataset = dataset.get_dataset(args.dataset_name, args.n_views, args.noise_scale, num_extra_chans)
-    print("ddp:", args.ddp)
+    # train_dataset = dataset.get_dataset('wfs', 2, args.noise_scale)
     
-    if args.ddp:
-        sampler = torch.utils.data.distributed.DistributedSampler(train_dataset, drop_last=True)
-        assert args.batch_size % args.world_size == 0
-        per_device_batch_size = args.batch_size // args.world_size
-
-        train_loader = torch.utils.data.DataLoader(
-            train_dataset, batch_size=per_device_batch_size, drop_last=True,
-            num_workers=args.workers, pin_memory=True, sampler=sampler)
-    else:
-        sampler = None
-        
-        train_loader = torch.utils.data.DataLoader(
-            train_dataset, batch_size=args.batch_size, shuffle=True,
-            num_workers=args.workers, pin_memory=True, drop_last=True)
+    # sampler = None
+    
+    # train_loader = torch.utils.data.DataLoader(
+    #     train_dataset, batch_size=args.batch_size, shuffle=True,
+    #     num_workers=args.workers, pin_memory=True, drop_last=True)
 
     # define memory and test dataset for knn monitoring
     if not args.ddp:
@@ -103,69 +58,24 @@ def main_worker(gpu, args):
     else:
         memory_loader = None
         test_loader = None
-           
-    if args.use_gpt:
-        model_args = dict(n_layer=args.n_layer, n_head=args.n_head, n_embd=args.n_embd, block_size=args.block_size,
-                  bias=args.bias, vocab_size=args.vocab_size, dropout=args.dropout, out_dim=args.out_dim, is_causal=args.is_causal, 
-                  proj_dim=args.proj_dim, pos=args.pos_enc, multi_chan=args.multi_chan) 
-        gptconf = GPTConfig(**model_args)
-        model = GPT(gptconf).cuda(gpu)
-    else:
-        model = ModelSimCLR(base_model=args.arch, out_dim=args.out_dim, proj_dim=args.proj_dim, \
-            fc_depth=args.fc_depth, expand_dim=args.expand_dim, multichan=args.multi_chan).cuda(gpu)
-
-    if not args.no_proj:
-        if args.arch == 'custom_encoder':
-            proj = Projector(rep_dim=args.out_dim, proj_dim=args.proj_dim)
-        elif args.arch == 'custom_encoder2':
-            proj = Projector2(rep_dim=args.out_dim, proj_dim=args.proj_dim)
-        elif args.arch == 'fc_encoder':
-            proj = Projector(rep_dim=args.out_dim, proj_dim=args.proj_dim)
-    else:
-        proj = None
     
-    # for n, p in model.named_parameters():
-    #     print(n, p.numel())
-    # print("number of encoder params: ", sum(p.numel() for p in self.backbone.parameters()))
-    print("number of transfomer params: ", sum(p.numel() for n,p in model.named_parameters() if 'transformer' in n))
-    print("number of fcpart params: ", sum(p.numel() for n,p in model.named_parameters() if ('lm_head' in n and 'proj' not in n)))
-    print("number of Proj params: ", sum(p.numel() for n,p in model.named_parameters() if ('proj' in n)))
-    print("number of online classifier params: ", sum(p.numel() for n,p in model.named_parameters() if 'online_head' in n))
+    model = SimCLR(args).cuda(gpu)
     
-    # moved this out from simclr.py since model needs to be pushed to gpu before defining optimizers else loading optimizer dict will be an issue
-    if args.ddp:
-        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
-        model = DDP(model, device_ids=[gpu])
-        
-    if args.optimizer == 'adam':
-        optimizer = torch.optim.Adam(model.parameters(), args.lr, weight_decay=args.weight_decay)
-        scheduler = None
-    else:
-        optimizer = torch.optim.SGD(model.parameters(), args.lr, weight_decay=args.weight_decay)
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=(args.epochs * len(train_loader)), eta_min=0,
-                                                           last_epoch=-1)
 
-    print("model and optimizer initialized!")
-        # automatically resume from checkpoint if it exists
-    if os.path.exists(os.path.join(args.checkpoint_dir, "checkpoint.pth")):
+    if not os.path.exists(args.checkpoint_dir):
+        raise ValueError("Checkpoint not found")
+    else:
         print("loading from previous checkpoint: ", args.checkpoint_dir)
-        ckpt = torch.load(os.path.join(args.checkpoint_dir, "checkpoint.pth"),
+        ckpt = torch.load(args.checkpoint_dir,
                           map_location='cpu')
         start_epoch = ckpt['epoch']
-        model.load_state_dict(ckpt['state_dict'])
-        optimizer.load_state_dict(ckpt['optimizer'])
+        nonddp_state_dict = {k.replace('module.', ''): v for k, v in ckpt['model'].items()}
+        model.load_state_dict(nonddp_state_dict)
 
-    else:
-        start_epoch = 0
-        
-    #  It’s a no-op if the 'gpu_index' argument is a negative integer or None.
-    # with torch.cuda.device(args.gpu_index):
-    print("starting SimCLR..")
+    knn_score = knn_monitor(net=model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True, args=args)
+    print(f"Epoch {start_epoch}, my knn_acc:{knn_score}")  
+
     
-    simclr = SimCLR(model=model, proj=proj, optimizer=optimizer, scheduler=scheduler, gpu=gpu, 
-                    sampler=sampler, args=args, start_epoch=start_epoch)
-    simclr.train(train_loader, memory_loader, test_loader)
-
 def make_sh_and_submit(args):
     os.makedirs('./scripts/', exist_ok=True)
     os.makedirs('./logs/', exist_ok=True)
@@ -201,7 +111,7 @@ def make_sh_and_submit(args):
 if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='PyTorch SimCLR')
-    parser.add_argument('--data', metavar='DIR', default='/home/gridsan/cloh/spike_contrastive/datasets/single_dy016_random_neurons_04_28_2023/',
+    parser.add_argument('--data', type=Path, metavar='DIR', default= '/gpfs/u/home/BNSS/BNSSlhch/scratch/spike_contrastive/dy016',
                         help='path to dataset')
     parser.add_argument('-dataset-name', default='wfs',
                         help='dataset name', choices=['wfs', 'stl10', 'cifar10'])
@@ -265,7 +175,7 @@ if __name__ == "__main__":
     parser.add_argument('--n_embd', default=64, type=int)
     parser.add_argument('--is_causal', action='store_true') # default = False
     # parser.add_argument('--block_size', default=2678, type=int) # this is the max sequence length
-    parser.add_argument('--block_size', default=121, type=int) # this is the max sequence length
+    parser.add_argument('--block_size', default=1331, type=int) # this is the max sequence length
     
     parser.add_argument('--dropout', default=0.2, type=float)
     parser.add_argument('--bias', action='store_true') # default = False
@@ -273,7 +183,6 @@ if __name__ == "__main__":
     parser.add_argument('--online_head', action='store_true') # default = False
     parser.add_argument('--pos_enc', default ='seq_11times', type=str)    
     parser.add_argument('--no_collide', action='store_true') # default = False
-    parser.add_argument('--num_extra_chans', default=0, type=int)
     
     args = parser.parse_args()
     
@@ -281,3 +190,11 @@ if __name__ == "__main__":
         make_sh_and_submit(args)
     else:
         main(args)
+
+"""
+python knn_eval.py --checkpoint-dir=/gpfs/u/home/BNSS/BNSSlhch/scratch/spike_ddp/saved_models/mc_gpt_posseq_causal_nembd64_block1331_bs132_lr0.001/checkpoint_epoch20.pth --multi_chan --is_causal --batch-size=128
+python knn_eval.py --checkpoint-dir=/gpfs/u/home/BNSS/BNSSlhch/scratch/spike_ddp/saved_models/mc_gpt_posseq_causal_nembd32_block1331_bs132_lr0.001/checkpoint.pth --multi_chan --is_causal --batch-size=128 --n_embd=32
+Epoch 800, my knn_acc:65.13333333333333
+Epoch 791, my knn_acc:65.3
+Epoch 701, my knn_acc:62.133333333333326
+"""

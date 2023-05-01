@@ -99,8 +99,9 @@ def main_worker(gpu, args):
     else:
         start_epoch = 0
 
+    num_extra_chans = args.num_extra_chans if args.multi_chan else 0
     ds = ContrastiveLearningDataset(args.data, args.out_dim, multi_chan=args.multi_chan)
-    dataset = ds.get_dataset('wfs', 2, args.noise_scale)
+    dataset = ds.get_dataset('wfs', 2, args.noise_scale, num_extra_chans)
     
     if args.ddp:
         sampler = torch.utils.data.distributed.DistributedSampler(dataset, drop_last=True)
@@ -141,7 +142,6 @@ def main_worker(gpu, args):
             # else:
             # topk_labels = None
             labels = labels.cuda(gpu, non_blocking=True)
-
             if args.optimizer != 'adam':
                 lr = adjust_learning_rate(args, optimizer, loader, step)
             else:
@@ -223,7 +223,11 @@ class SimCLR(nn.Module):
         self.online_head = nn.Linear(gptconf.out_dim, 10) # 10 classes
 
 
-    def forward(self, y1, y2, labels):
+    def forward(self, y1, y2=None, labels=None):
+        if y2 is None:
+            r1 = self.backbone(y1)
+            # z1 = self.projector(r1)
+            return r1
         r1 = self.backbone(y1)
         r2 = self.backbone(y2)
 
@@ -311,7 +315,7 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='SimCLR Training')
-    parser.add_argument('--data', type=Path, metavar='DIR', default= '/gpfs/u/home/BNSS/BNSSlhch/scratch/spike_contrastive/dy016',
+    parser.add_argument('--data', type=Path, metavar='DIR', default= '/gpfs/u/home/BNSS/BNSSlhch/scratch/spike_data/dy016',
                         help='path to dataset')
     parser.add_argument('--dataset', type=str, default='imagenet', choices=['imagenet', 'cifar100'],
                         help='dataset (imagenet, cifar100)')
@@ -403,7 +407,7 @@ if __name__ == "__main__":
     parser.add_argument('--online_head', action='store_true') # default = False
     parser.add_argument('--ddp', action='store_true') 
     parser.add_argument('--rank', default=0, type=int) 
-
+    parser.add_argument('--num_extra_chans', default=0, type=int)
     args = parser.parse_args()
     
     main(args)
