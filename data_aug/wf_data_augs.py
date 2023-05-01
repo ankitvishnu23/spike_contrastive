@@ -333,7 +333,21 @@ class PCA_Reproj(object):
         recon = self.pca_.inverse_transform(transform)[0]
 
         return recon
+    
+    
+class ElectrodeDropout(object):
+    def __init__(self, prob=0.1):
+        self.p_drop_chan = prob
+        
+    def __call__(self, wf):
+        n_chan, n_times = wf.shape
+        chan_mask = -1 * np.random.binomial(1, self.p_drop_chan, n_chan) + 1
+        print(chan_mask)
+        
+        wf[chan_mask == 0] = np.zeros(n_times)
 
+        return wf
+    
     
 class ToWfTensor(object):
     """Convert ndarrays in sample to Tensors."""

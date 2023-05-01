@@ -1,6 +1,7 @@
 from matplotlib.gridspec import GridSpec
 import matplotlib.pyplot as plt
 import numpy as np
+from data_aug.wf_data_augs import AmpJitter, Jitter, Collide, Crop, SmartNoise, ElectrodeDropout
 # %matplotlib inline
 plt.rc("figure", dpi=100)
 SMALL_SIZE = 8
@@ -195,6 +196,221 @@ def plot_spike_loc_classes(locs, labels, num_classes, geom, title, save_name=Non
     # fig.subplots_adjust(wspace=0.12)
     
     fig.subplots_adjust(hspace=0.2)
+    
+    if save_name is not None:
+        plt.savefig(save_name)
+
+    
+def plot_one_mc_transform(mc_wfs, aug, n_extra_chans, save_name=None):
+    n_wfs, n_chans, n_times = mc_wfs.shape
+    
+    mc_subsel = Crop(0.0, n_extra_chans)
+    if aug == 'crop':
+        aug_to_use = Crop(1.0, n_extra_chans)
+        aug_title = 'Crop'
+        num_rows = 3
+    elif aug == 'collision':
+        aug_to_use = Collide(mc_wfs=True)
+        aug_title = 'Multi-Chan Collision'
+        num_rows = 4
+    elif aug == 'dropout':
+        aug_to_use = ElectrodeDropout(prob=0.2)
+        aug_title = 'Electrode Dropout'
+        num_rows = 3
+    elif aug == 'jitter':
+        aug_to_use = Jitter()
+        aug_title = 'Multi-Chan Jitter'
+        num_rows = 3
+    elif aug == 'sc_noise':
+        aug_to_use = SmartNoise()
+        aug_title = 'Multi-Chan Noise'
+        num_rows = 3
+    elif aug == 'sc_amp':
+        aug_to_use = AmpJitter()
+        aug_title = 'Multi-Chan Amp Jitter'
+        num_rows = 3
+    else:
+        print('Augmentation not available')
+        return
+    
+    rand_ind = np.random.choice(n_wfs)
+    rand_wf = mc_wfs[rand_ind]
+    print(rand_ind)
+    
+    sub_wf = mc_subsel(rand_wf.copy())
+    if aug == 'collision':
+        aug_wf, coll_wf = aug_to_use(rand_wf.copy())
+        coll_wf = mc_subsel(coll_wf)
+    else: 
+        aug_wf = aug_to_use(rand_wf.copy())
+    aug_wf = aug_wf if aug == 'shift' else mc_subsel(aug_wf)
+    print(aug_wf.shape)
+    
+    SMALL_SIZE = 14
+    MEDIUM_SIZE = 18
+    BIGGER_SIZE = 22
+    plt.rc('axes', titlesize=MEDIUM_SIZE)     # fontsize of the axes title
+    plt.rc('axes', labelsize=SMALL_SIZE)    # fontsize of the x and y labels
+    plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+
+    fig = plt.figure(figsize=(16, 8))
+#     fig, ax = plt.subplots(9, 5, figsize=(24, 16))
+    gs = GridSpec(num_rows, 5, figure=fig)
+    x = np.arange(5*121)
+    chan_coords = np.array([121*i for i in range(1, 5)])
+
+    ax0 = fig.add_subplot(gs[0, :])
+    ax0.title.set_text('Flattened WF with 5 channels')
+    ax0.plot(x, sub_wf.flatten(), color='blue', label='flattened spike')
+    ax0.get_xaxis().set_visible(False)
+    for coord in chan_coords:
+        ax0.axvline(x=coord, ls='--', color='black')
+    ylims = ax0.get_ylim()
+    print(ylims)
+
+    if num_rows == 3:
+        ax1 = fig.add_subplot(gs[1, :])
+        ax1.title.set_text('Flattened Augmented WF with 5 channels')
+        ax1.plot(x, aug_wf.flatten(), color='red', label='flat augmented spike')
+        ax1.get_xaxis().set_visible(False)
+        for coord in chan_coords:
+            ax1.axvline(x=coord, ls='--', color='black')
+        ax2 = fig.add_subplot(gs[2, :])
+        ax2.title.set_text('Overlaid WFs')
+        ax2.plot(x, sub_wf.flatten(), color='blue')
+        ax2.plot(x, aug_wf.flatten(), color='red')
+        ax2.get_xaxis().set_visible(False)
+        for coord in chan_coords:
+            ax2.axvline(x=coord, ls='--', color='black')
+    else: 
+        ax1 = fig.add_subplot(gs[1, :])
+        ax1.title.set_text('WF used for Collision')
+        ax1.plot(x, coll_wf.flatten(), color='darkgreen')
+        ax1.get_xaxis().set_visible(False)
+        ax1.set_ylim(ylims)
+        for coord in chan_coords:
+            ax1.axvline(x=coord, ls='--', color='black')
+        ax2 = fig.add_subplot(gs[2, :])
+        ax2.title.set_text('Flattened Augmented WF with 5 channels')
+        ax2.plot(x, aug_wf.flatten(), color='red', label='flat augmented spike')
+        ax2.get_xaxis().set_visible(False)
+        for coord in chan_coords:
+            ax2.axvline(x=coord, ls='--', color='black')
+        ax3 = fig.add_subplot(gs[3, :])
+        ax3.title.set_text('Overlaid WFs')
+        ax3.plot(x, sub_wf.flatten(), color='blue')
+        ax3.plot(x, aug_wf.flatten(), color='red')
+        ax3.get_xaxis().set_visible(False)
+        for coord in chan_coords:
+            ax3.axvline(x=coord, ls='--', color='black')
+
+    fig.suptitle('Multi-Channel {} WF Augmentation'.format(aug_title))
+    fig.subplots_adjust(wspace=0)
+    fig.subplots_adjust(top=0.9)
+    fig.subplots_adjust(hspace=0.5)
+    
+    if save_name is not None:
+        plt.savefig(save_name)
+
+def plot_one_sc_transform(sc_wfs, aug, save_name=None):
+    n_wfs, n_times = sc_wfs.shape
+    
+    if aug == 'amp_jitter':
+        aug_to_use = AmpJitter()
+        aug_title = 'Amplitude Jitter'
+        num_cols = 3
+    elif aug == 'crop':
+        aug_to_use = Crop(0.0, 1)
+        aug_title = 'Crop'
+        num_cols = 3
+    elif aug == 'jitter':
+        aug_to_use = Jitter()
+        aug_title = 'Jitter'
+        num_cols = 3
+    elif aug == 'collision':
+        aug_to_use = Collide()
+        aug_title = 'Collision'
+        num_cols = 4
+    elif aug == 'noise':
+        aug_to_use = SmartNoise()
+        aug_title = 'Noise'
+        num_cols = 3
+    else:
+        print('Augmentation not available')
+        return
+    
+    rand_ind = np.random.choice(n_wfs)
+    rand_wf = sc_wfs[rand_ind]
+    print(rand_ind)
+    
+    if aug == 'collision':
+        aug_wf, coll_wf = aug_to_use(rand_wf.copy())
+        aug_wf = np.squeeze(aug_wf)
+        coll_wf = np.squeeze(coll_wf)
+    elif aug == 'crop':
+        aug_wf = aug_to_use(rand_wf.copy())
+        aug_wf = np.squeeze(aug_wf)
+    else: 
+        aug_wf = aug_to_use(rand_wf.copy())
+    
+    if len(aug_wf.shape) == 2:
+        aug_wf = np.squeeze(aug_wf)
+    
+    SMALL_SIZE = 10
+    MEDIUM_SIZE = 12
+    BIGGER_SIZE = 16
+    plt.rc('axes', titlesize=MEDIUM_SIZE)     # fontsize of the axes title
+    plt.rc('axes', labelsize=SMALL_SIZE)    # fontsize of the x and y labels
+    plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+
+    fig = plt.figure(figsize=(4*num_cols, 4))
+#     fig, ax = plt.subplots(9, 5, figsize=(24, 16))
+    gs = GridSpec(1, num_cols, figure=fig)
+    x = np.arange(121)
+#     chan_coords = np.array([121*i for i in range(1, 6)])
+
+    ax0 = fig.add_subplot(gs[0, 0])
+    ax0.title.set_text('WF')
+    ax0.plot(x, rand_wf, color='blue')
+    ax0.get_xaxis().set_visible(False)
+
+    if num_cols == 3:
+        ax1 = fig.add_subplot(gs[0, 1], sharey=ax0)
+        ax1.title.set_text('Augmented WF')
+        ax1.plot(x, aug_wf, color='red')
+        ax1.get_xaxis().set_visible(False)
+        ax1.get_yaxis().set_visible(False)
+        
+        ax2 = fig.add_subplot(gs[0, 2], sharey=ax0)
+        ax2.title.set_text('Overlaid WFs')
+        ax2.plot(x, rand_wf, color='blue')
+        ax2.plot(x, aug_wf, color='red')
+        ax2.get_xaxis().set_visible(False)
+        ax2.get_yaxis().set_visible(False)
+    else: 
+        ax1 = fig.add_subplot(gs[0, 1], sharey=ax0)
+        ax1.title.set_text('Collided WF')
+        ax1.plot(x, coll_wf, color='darkgreen')
+        ax1.get_xaxis().set_visible(False)
+        ax1.get_yaxis().set_visible(False)
+        
+        ax2 = fig.add_subplot(gs[0, 2], sharey=ax0)
+        ax2.title.set_text('Augmented WF')
+        ax2.plot(x, aug_wf, color='red')
+        ax2.get_xaxis().set_visible(False)
+        ax2.get_yaxis().set_visible(False)
+        
+        ax3 = fig.add_subplot(gs[0, 3], sharey=ax0)
+        ax3.title.set_text('Overlaid WFs')
+        ax3.plot(x, rand_wf, color='blue')
+        ax3.plot(x, aug_wf, color='red')
+        ax3.get_xaxis().set_visible(False)
+        ax3.get_yaxis().set_visible(False)
+
+    fig.suptitle('Single-Channel {} WF Augmentation'.format(aug_title))
+    fig.subplots_adjust(wspace=0)
+    fig.subplots_adjust(top=0.85)
+    fig.subplots_adjust(hspace=0.5)
     
     if save_name is not None:
         plt.savefig(save_name)
