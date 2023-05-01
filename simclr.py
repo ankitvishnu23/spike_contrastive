@@ -179,6 +179,7 @@ class SimCLR(object):
                     # print(f"loss: {loss}, knn_acc:{knn_score}")
                     knn_score = knn_monitor(net=self.model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True, args=self.args)
                     print(f"loss: {loss}, my knn_acc:{knn_score}")
+                    self.logger.log_value('knn_score', knn_score, epoch_counter)
                     
             if self.args.rank == 0 or not self.args.ddp:
                 logging.debug(f"Epoch: {epoch_counter}\tLoss: {loss}")
@@ -186,7 +187,6 @@ class SimCLR(object):
                 # self.writer.add_scalar('loss', loss, epoch_counter)
                 # self.writer.add_scalar('pca_knn_score', pca_score, global_step=n_iter)
                 # self.writer.add_scalar('knn_score', knn_score, epoch_counter)
-                self.logger.log_value('knn_score', knn_score, epoch_counter)
                 
                 curr_lr = self.optimizer.param_groups[0]['lr'] if self.scheduler == None else self.scheduler.get_lr()[0]
                 # self.writer.add_scalar('learning_rate', curr_lr, epoch_counter)

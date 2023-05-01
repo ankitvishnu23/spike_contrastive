@@ -201,7 +201,7 @@ def make_sh_and_submit(args):
 if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='PyTorch SimCLR')
-    parser.add_argument('--data', metavar='DIR', default='/home/gridsan/cloh/spike_contrastive/dy016/',
+    parser.add_argument('--data', metavar='DIR', default='/home/gridsan/cloh/spike_contrastive/datasets/single_dy016_random_neurons_04_28_2023/',
                         help='path to dataset')
     parser.add_argument('-dataset-name', default='wfs',
                         help='dataset name', choices=['wfs', 'stl10', 'cifar10'])

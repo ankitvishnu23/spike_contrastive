@@ -125,8 +125,9 @@ class SmartNoise(object):
                         (waveform_length, n_neigh))
         
         # noise_start = np.random.choice(n_neigh - n_chans)
-        chan_nums[chan_nums > n_neigh-1] = n_neigh - 1
-        chan_nums[chan_nums < 0] = 0
+        if type(chan_nums) != np.int64: 
+            chan_nums[chan_nums > n_neigh-1] = n_neigh - 1
+            chan_nums[chan_nums < 0] = 0
 
 #         noise_sel = np.random.choice(n_neigh, n_chans, replace=False)
         noise_wfs = self.noise_scale * the_noise[:, chan_nums].T
@@ -299,7 +300,8 @@ class Crop(object):
             shift = np.random.randint(-self.num_extra_chans, self.num_extra_chans+1)
             max_chan_ind += shift
         wf = wf[max_chan_ind-self.num_extra_chans:max_chan_ind+self.num_extra_chans+1]
-        chan_nums = chan_nums[max_chan_ind-self.num_extra_chans:max_chan_ind+self.num_extra_chans+1]
+        if type(chan_nums) != np.int64: 
+            chan_nums = chan_nums[max_chan_ind-self.num_extra_chans:max_chan_ind+self.num_extra_chans+1]
         # in single channel case the wf will become 1 dimensional
         if len(wf.shape) == 1:
             wf = np.expand_dims(wf, axis=0)
