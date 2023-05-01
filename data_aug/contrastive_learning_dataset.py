@@ -7,20 +7,20 @@ from torchvision.transforms import transforms
 from data_aug.gaussian_blur import GaussianBlur
 from torchvision import transforms, datasets
 from torch.utils.data import Dataset
-from data_aug.view_generator import ContrastiveLearningViewGenerator, LabelViewGenerator
+from data_aug.view_generator import ContrastiveLearningViewGenerator
 from exceptions.exceptions import InvalidDatasetSelection
-from data_aug.wf_data_augs import AmpJitter, Jitter, Collide, SmartNoise, ToWfTensor, PCA_Reproj
+from data_aug.wf_data_augs import AmpJitter, Jitter, Collide, SmartNoise, ToWfTensor, PCA_Reproj, Crop
 from typing import Any, Callable, Optional, Tuple
 
 class WFDataset(Dataset):
     filename = "spikes_train.npy"
     multi_filename = "multichan_spikes_train.npy"
+    single_chan_mcs = "channel_num_train.npy"
 
     def __init__(
         self,
         root: str,
-        transform: Optional[Callable] = None,
-        target_transform: Optional[Callable] = None,
+        transform: Optional[Callable] = None
     ) -> None:
 
         super().__init__()
@@ -28,35 +28,29 @@ class WFDataset(Dataset):
         self.data: Any = []
 
         # now load the numpy array
-        self.data = np.load(root + self.filename).astype('float32')
+        self.data = np.load(os.path.join(root, self.filename))
         print(self.data.shape)
         self.root = root
+        self.max_chans = np.load(os.path.join(root, self.single_chan_mcs))
         self.transform = transform
-        self.targets = np.array([[i for j in range(1200)] \
-                                for i in range(10)]).reshape(-1).astype('long')
-        self.target_transform = target_transform
 
     def __getitem__(self, index: int) -> Any :
         """
         Args:
             index (int): Index
-
         Returns:
             tensor: wf
         """
         wf = self.data[index].astype('float32')
-        y = self.targets[index].astype('long')
+        mc = self.max_chans[index]
 
         # doing this so that it is a tensor
         # wf = torch.from_numpy(wf)
 
         if self.transform is not None:
-            wf = self.transform(wf)
+            wf = self.transform([wf, mc])
 
-        if self.target_transform is not None:
-            y = self.target_transform(y)
-            
-        return wf, y
+        return wf
 
 
     def __len__(self) -> int:
@@ -65,12 +59,12 @@ class WFDataset(Dataset):
 
 class WF_MultiChan_Dataset(Dataset):
     filename = "multichan_spikes_train.npy"
+    multi_chan_mcs = "multichan_channel_num_train.npy"
 
     def __init__(
         self,
         root: str,
-        transform: Optional[Callable] = None,
-        target_transform: Optional[Callable] = None
+        transform: Optional[Callable] = None
     ) -> None:
 
         super().__init__()
@@ -78,34 +72,29 @@ class WF_MultiChan_Dataset(Dataset):
         self.data: Any = []
 
         # now load the numpy array
-        self.data = np.load(root + self.filename)
+        self.data = np.load(os.path.join(root, self.filename))
         print(self.data.shape)
         self.root = root
+        self.chan_nums = np.load(os.path.join(root, self.multi_chan_mcs))
         self.transform = transform
-        self.targets = np.array([[i for j in range(1200)] \
-                                for i in range(10)]).reshape(-1).astype('long')
-        self.target_transform = target_transform
 
     def __getitem__(self, index: int) -> Any :
         """
         Args:
             index (int): Index
-
         Returns:
             tensor: wf
         """
         wf = self.data[index].astype('float32')
-        y = self.targets[index].astype('long')
+        chan_nums = self.chan_nums[index]
+
         # doing this so that it is a tensor
         # wf = torch.from_numpy(wf)
 
         if self.transform is not None:
-            wf = self.transform(wf)
-        
-        if self.target_transform is not None:
-            y = self.target_transform(y)
+            wf = self.transform([wf, chan_nums])
 
-        return wf, y
+        return wf
 
 
     def __len__(self) -> int:
@@ -129,7 +118,8 @@ class WFDataset_lab(Dataset):
                 self.filename = "spikes_train.npy"
             else:
                 self.filename = "multichan_spikes_train.npy"
-            self.data = np.load(root + self.filename).astype('float32')
+            print(multi_chan, self.filename)
+            self.data = np.load(os.path.join(root, self.filename)).astype('float32')
             self.targets = np.array([[i for j in range(1200)] \
                                 for i in range(10)]).reshape(-1).astype('long')
         elif split == 'test':
@@ -137,7 +127,7 @@ class WFDataset_lab(Dataset):
                 self.filename = "spikes_test.npy"
             else:
                 self.filename = "multichan_spikes_test.npy"
-            self.data = np.load(root + self.filename).astype('float32')
+            self.data = np.load(os.path.join(root, self.filename)).astype('float32')
             self.targets = np.array([[i for j in range(300)] \
                                 for i in range(10)]).reshape(-1).astype('long')
             
@@ -152,7 +142,6 @@ class WFDataset_lab(Dataset):
         """
         Args:
             index (int): Index
-
         Returns:
             tensor: wf
         """
@@ -171,11 +160,10 @@ class WFDataset_lab(Dataset):
         return len(self.data)
 
 class ContrastiveLearningDataset:
-    def __init__(self, root_folder, lat_dim, multi_chan, no_collide=False):
+    def __init__(self, root_folder, lat_dim, multi_chan):
         self.root_folder = root_folder
         self.lat_dim = lat_dim
         self.multi_chan = multi_chan
-        self.no_collide = no_collide
     
 
     @staticmethod
@@ -191,25 +179,17 @@ class ContrastiveLearningDataset:
         return data_transforms
 
     @staticmethod
-    def get_wf_pipeline_transform(self, temp_cov_fn, spatial_cov_fn, noise_scale, no_collide=False):
+    def get_wf_pipeline_transform(self, temp_cov_fn, spatial_cov_fn, noise_scale, num_extra_chans):
         temporal_cov = np.load(os.path.join(self.root_folder, temp_cov_fn))
         spatial_cov = np.load(os.path.join(self.root_folder, spatial_cov_fn))
         """Return a set of data augmentation transformations on waveforms."""
-        if no_collide:
-            data_transforms = transforms.Compose([
+        data_transforms = transforms.Compose([
                                             transforms.RandomApply([AmpJitter()], p=0.7),
                                               transforms.RandomApply([Jitter()], p=0.6),
                                             #   transforms.RandomApply([PCA_Reproj(root_folder=self.root_folder)], p=0.4),
                                               transforms.RandomApply([SmartNoise(self.root_folder, temporal_cov, spatial_cov, noise_scale)], p=0.5),
-                                            #   transforms.RandomApply([Collide(self.root_folder)], p=0.4),
-                                              ToWfTensor()])
-        else:
-            data_transforms = transforms.Compose([
-                                            transforms.RandomApply([AmpJitter()], p=0.7),
-                                              transforms.RandomApply([Jitter()], p=0.6),
-                                            #   transforms.RandomApply([PCA_Reproj(root_folder=self.root_folder)], p=0.4),
-                                              transforms.RandomApply([SmartNoise(self.root_folder, temporal_cov, spatial_cov, noise_scale)], p=0.5),
-                                              transforms.RandomApply([Collide(self.root_folder)], p=0.4),
+                                              transforms.RandomApply([Collide(self.root_folder, multi_chan=self.multi_chan)], p=0.4),
+                                              Crop(num_extra_chans=num_extra_chans),
                                               ToWfTensor()])
         
         return data_transforms
@@ -221,7 +201,7 @@ class ContrastiveLearningDataset:
         
         return data_transforms
 
-    def get_dataset(self, name, n_views, noise_scale=1.0):
+    def get_dataset(self, name, n_views, noise_scale=1.0, num_extra_chans=0):
         temp_cov_fn = 'temporal_cov_example.npy'    
         spatial_cov_fn = 'spatial_cov_example.npy'
         if self.multi_chan:
@@ -231,17 +211,15 @@ class ContrastiveLearningDataset:
                                                                   self.get_wf_pipeline_transform(self, temp_cov_fn,
                                                                   spatial_cov_fn,
                                                                 #   noise_scale), self.get_pca_transform(self),
-                                                                  noise_scale, self.no_collide), None,
-                                                                  n_views),
-                                                              target_transform=LabelViewGenerator()),
+                                                                  noise_scale, 0), None,
+                                                                  n_views)),
                           'wfs_multichan': lambda: WF_MultiChan_Dataset(self.root_folder,
                                                               transform=ContrastiveLearningViewGenerator(
                                                                   self.get_wf_pipeline_transform(self, temp_cov_fn,
                                                                   spatial_cov_fn,
                                                                 #   noise_scale), self.get_pca_transform(self),
-                                                                  noise_scale, self.no_collide), None,
-                                                                  n_views),
-                                                              target_transform=LabelViewGenerator()),
+                                                                  noise_scale, num_extra_chans), None,
+                                                                  n_views)),
                           'cifar10': lambda: datasets.CIFAR10(self.root_folder, train=True,
                                                               transform=ContrastiveLearningViewGenerator(
                                                                   self.get_simclr_pipeline_transform(32),
@@ -260,6 +238,3 @@ class ContrastiveLearningDataset:
             raise InvalidDatasetSelection()
         else:
             return dataset_fn()
-    
-
-

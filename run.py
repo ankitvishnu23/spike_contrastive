@@ -67,10 +67,11 @@ def main_worker(gpu, args):
 
     # tr_dataset = WFDataset_lab(args.data, split='train')
     # te_dataset = WFDataset_lab(args.data, split='test')
+    num_extra_chans = args.num_extra_chans if args.multi_chan else 0
     
-    dataset = ContrastiveLearningDataset(args.data, args.out_dim, multi_chan=args.multi_chan, no_collide=args.no_collide)
+    dataset = ContrastiveLearningDataset(args.data, args.out_dim, multi_chan=args.multi_chan)
 
-    train_dataset = dataset.get_dataset(args.dataset_name, args.n_views, args.noise_scale)
+    train_dataset = dataset.get_dataset(args.dataset_name, args.n_views, args.noise_scale, num_extra_chans)
     print("ddp:", args.ddp)
     
     if args.ddp:
@@ -272,6 +273,7 @@ if __name__ == "__main__":
     parser.add_argument('--online_head', action='store_true') # default = False
     parser.add_argument('--pos_enc', default ='seq_11times', type=str)    
     parser.add_argument('--no_collide', action='store_true') # default = False
+    parser.add_argument('--num_extra_chans', default=0)
     
     args = parser.parse_args()
     

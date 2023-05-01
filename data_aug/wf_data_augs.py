@@ -37,19 +37,21 @@ class AmpJitter(object):
         self.hi = hi
 
     def __call__(self, sample):
-        wf = sample
+        if len(sample) == 2:
+            wf, chan_nums = sample
+        else:
+            wf = sample
+
         if len(wf.shape) == 1:
             wf = np.expand_dims(wf, axis=0)
         n_chans = wf.shape[0]
         
-        amp_jit = np.random.uniform(self.lo, self.hi, n_chans)
+        amp_jit_value = np.random.uniform(self.lo, self.hi)
+        amp_jit = np.array([amp_jit_value for i in range(n_chans)])
 
         wf = wf * amp_jit[:, None]
-        # for i in range(n_chans):
-        #     amp_jit = np.random.uniform(self.lo, self.hi)
-        #     wf[i] = amp_jit * wf[i]
     
-        return wf
+        return [wf, chan_nums]
 
 class GaussianNoise(object):
     """Rescale the image in a sample to a given size.
@@ -59,17 +61,20 @@ class GaussianNoise(object):
             to output_size keeping aspect ratio the same.
     """
     def __call__(self, sample):
-        wf = sample
+        if len(sample) == 2:
+            wf, chan_nums = sample
+        else:
+            wf = sample
+        
         if len(wf.shape) == 1:
             wf = np.expand_dims(wf, axis=0)
         n_chans = wf.shape[0]
         w = wf.shape[1]
         
-        for i in range(n_chans):
-            noise_wf = np.random.normal(0, 1, w)
-            wf[i] = np.add(wf[i], noise_wf)
+        noise_wf = np.random.normal(0, 1, (n_chans, w))
+        wf = np.add(wf, noise_wf)
 
-        return wf
+        return [wf, chan_nums]
 
 class SmartNoise(object):
     """Rescale the image in a sample to a given size.
@@ -96,7 +101,11 @@ class SmartNoise(object):
         
 
     def __call__(self, sample):
-        wf = sample
+        if len(sample) == 2:
+            wf, chan_nums = sample
+        else:
+            wf = sample
+        
         if len(wf.shape) == 1:
             wf = np.expand_dims(wf, axis=0)
         n_chans = wf.shape[0]
@@ -114,18 +123,18 @@ class SmartNoise(object):
 
         the_noise = np.reshape(np.matmul(reshaped_noise, self.spatial_cov),
                         (waveform_length, n_neigh))
+        
+        # noise_start = np.random.choice(n_neigh - n_chans)
+        chan_nums[chan_nums > n_neigh-1] = n_neigh - 1
+        chan_nums[chan_nums < 0] = 0
 
-        noise_sel = np.random.choice(n_neigh, n_chans, replace=False)
-        noise_wfs = self.noise_scale * the_noise[:, noise_sel].T
+#         noise_sel = np.random.choice(n_neigh, n_chans, replace=False)
+        noise_wfs = self.noise_scale * the_noise[:, chan_nums].T
         wf = wf + noise_wfs
 
-        # for i in range(n_chans):
-        #     noise_wf = the_noise[:, noise_sel[i]]
-        #     noise_wf = self.noise_scale * noise_wf
-        #     wf[i] = np.add(wf[i], noise_wf)
+        return [wf, chan_nums]
 
-        return wf
-    
+
 class Collide(object):
     """Rescale the image in a sample to a given size.
     Args:
@@ -136,23 +145,28 @@ class Collide(object):
     root_folder = '/home/jovyan/nyu47-templates/'
     temp_name = 'spikes_train.npy'
 
-    def __init__(self, root_folder=None, templates=None, multichan=False):
+    def __init__(self, root_folder=None, templates=None, multi_chan=False):
+        temp_name = self.temp_name
         if root_folder is not None:
             self.root_folder = root_folder
-        if multichan:
+        if multi_chan:
             temp_name = 'multichan_' + temp_name
         if templates is None:
-            templates = np.load(os.path.join(self.root_folder, self.temp_name))
+            templates = np.load(os.path.join(self.root_folder, temp_name))
         # assert isinstance(templates, (array, array))
         self.templates = templates
 
     def __call__(self, sample):
-        wf = sample
+        if len(sample) == 2:
+            wf, chan_nums = sample
+        else:
+            wf = sample
+        
         if len(wf.shape) == 1:
             wf = np.expand_dims(wf, axis=0)
         n_chans = wf.shape[0]
         w = wf.shape[1]
-
+        
         temp_idx = np.random.randint(0, len(self.templates))
         temp_sel = self.templates[temp_idx]
         temp_sel = np.expand_dims(temp_sel, axis=0) if len(temp_sel.shape) == 1 else temp_sel
@@ -165,7 +179,7 @@ class Collide(object):
 
         wf = np.add(wf, temp_sel)
 
-        return wf
+        return [wf, chan_nums]
     
     def shift_chans(self, wf, shift_):
         # use template feat_channel shifts to interpolate shift of all spikes on all other chans
@@ -204,7 +218,11 @@ class Jitter(object):
         self.shift = shift
 
     def __call__(self, sample):
-        wf = sample
+        if len(sample) == 2:
+            wf, chan_nums = sample
+        else:
+            wf = sample
+
         if len(wf.shape) == 1:
             wf = np.expand_dims(wf, axis=0)
         n_chans = wf.shape[0]
@@ -231,11 +249,12 @@ class Jitter(object):
 
         shift = (2* np.random.binomial(1, 0.5)-1) * np.random.uniform(0, self.shift)
         
-        idx_selection = np.random.choice(self.up_factor, n_chans)
-        wf = up_shifted_temp[np.arange(n_chans), idx_selection]
+        idx_selection = np.random.choice(self.up_factor)
+        idxs = np.array([idx_selection for i in range(n_chans)])
+        wf = up_shifted_temp[np.arange(n_chans), idxs]
         wf = self.shift_chans(wf, shift)
 
-        return wf
+        return [wf, chan_nums]
 
     def shift_chans(self, wf, shift_):
         # use template feat_channel shifts to interpolate shift of all spikes on all other chans
@@ -256,6 +275,37 @@ class Jitter(object):
 
         return wf_final
     
+
+class Crop(object):
+    def __init__(self, prob=0.5, num_extra_chans=2):
+        self.prob = prob
+        self.num_extra_chans = num_extra_chans
+        
+    def __call__(self, sample):
+        if len(sample) == 2:
+            wf, chan_nums = sample
+        else:
+            wf = sample
+        
+        if len(wf.shape) == 1:
+            wf = np.expand_dims(wf, axis=0)
+        n_chans = wf.shape[0]
+        n_times = wf.shape[1]
+        
+        max_chan_ind = math.floor(n_chans/2)
+
+        apply = np.random.binomial(1, self.prob)
+        if apply:
+            shift = np.random.randint(-self.num_extra_chans, self.num_extra_chans+1)
+            max_chan_ind += shift
+        wf = wf[max_chan_ind-self.num_extra_chans:max_chan_ind+self.num_extra_chans+1]
+        chan_nums = chan_nums[max_chan_ind-self.num_extra_chans:max_chan_ind+self.num_extra_chans+1]
+        # in single channel case the wf will become 1 dimensional
+        if len(wf.shape) == 1:
+            wf = np.expand_dims(wf, axis=0)
+
+        return [wf, chan_nums]
+
 
 class PCA_Reproj(object):
     """Rescale the image in a sample to a given size.
@@ -289,11 +339,15 @@ class ToWfTensor(object):
     """Convert ndarrays in sample to Tensors."""
 
     def __call__(self, sample):
-        wf = sample
+        if len(sample) == 2:
+            wf, chan_nums = sample
+        else:
+            wf = sample
+            
         if len(wf.shape) == 1:
             wf = np.expand_dims(wf, axis=0)
         
-        return torch.from_numpy(wf)
+        return torch.from_numpy(wf.astype('float16'))
 
 
 ###### TORCH VERSIONS ######
