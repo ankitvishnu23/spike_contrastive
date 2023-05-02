@@ -62,11 +62,13 @@ def main_worker(gpu, args):
             backend='nccl', init_method=args.dist_url,
             world_size=args.world_size, rank=args.rank)
     
-    torch.cuda.set_device(gpu)
+    # torch.cuda.set_device(gpu)
     torch.backends.cudnn.benchmark = True
+    # torch.backends.cudnn.deterministic = True
 
     # tr_dataset = WFDataset_lab(args.data, split='train')
     # te_dataset = WFDataset_lab(args.data, split='test')
+    
     num_extra_chans = args.num_extra_chans if args.multi_chan else 0
     
     dataset = ContrastiveLearningDataset(args.data, args.out_dim, multi_chan=args.multi_chan)
@@ -256,6 +258,7 @@ if __name__ == "__main__":
     parser.add_argument('--log-dir', default='./logs/', type=str) # can define type as PATH as well
     parser.add_argument('--ddp', action='store_true')
     parser.add_argument('--rank', default=0, type=int)
+    parser.add_argument('--world_size', default=2, type=int)
     parser.add_argument('--eval_knn_every_n_epochs', default=1, type=int)
     
     parser.add_argument('--use_gpt', action='store_true') # default = False
@@ -276,6 +279,8 @@ if __name__ == "__main__":
     parser.add_argument('--num_extra_chans', default=0, type=int)
     
     args = parser.parse_args()
+    
+    print("MULTICHAN", args.multi_chan)
     
     if args.submit:
         make_sh_and_submit(args)

@@ -113,23 +113,21 @@ class SmartNoise(object):
 
         assert self.temporal_cov.shape[0] == w
 
-        n_neigh, _ = self.spatial_cov.shape
+        n_chans_total, _ = self.spatial_cov.shape
         waveform_length, _ = self.temporal_cov.shape
 
-        noise = np.random.normal(size=(waveform_length, n_neigh))
+        noise = np.random.normal(size=(waveform_length, n_chans_total))
 
         noise = np.matmul(noise.T, self.temporal_cov).T
-        reshaped_noise = np.reshape(noise, (-1, n_neigh))
+        reshaped_noise = np.reshape(noise, (-1, n_chans_total))
 
         the_noise = np.reshape(np.matmul(reshaped_noise, self.spatial_cov),
-                        (waveform_length, n_neigh))
+                        (waveform_length, n_chans_total))
         
-        # noise_start = np.random.choice(n_neigh - n_chans)
+        # noise_start = np.random.choice(n_chans_total - n_chans)
         if type(chan_nums) != np.int64: 
-            chan_nums[chan_nums > n_neigh-1] = n_neigh - 1
+            chan_nums[chan_nums > n_chans_total-1] = n_chans_total - 1
             chan_nums[chan_nums < 0] = 0
-
-#         noise_sel = np.random.choice(n_neigh, n_chans, replace=False)
         noise_wfs = self.noise_scale * the_noise[:, chan_nums].T
         wf = wf + noise_wfs
 
@@ -350,199 +348,3 @@ class ToWfTensor(object):
             wf = np.expand_dims(wf, axis=0)
         
         return torch.from_numpy(wf.astype('float16'))
-
-
-###### TORCH VERSIONS ######
-
-# class AmpJitter(object):
-#     """Rescale the image in a sample to a given size.
-
-#     Args:
-#         output_size (tuple or int): Desired output size. If tuple, output is
-#             matched to output_size. If int, smaller of image edges is matched
-#             to output_size keeping aspect ratio the same.
-#     """
-
-#     def __call__(self, sample):
-#         wf = sample
-#         w = wf.shape[0]
-
-#         uni = Uniform(torch.tensor([0.9]), torch.tensor([1.1]))
-#         amp_jit = uni.rsample(torch.Size(w))
-
-#         wf = torch.Mul(wf, amp_jit)
-    
-#         return wf
-
-# class Noise(object):
-#     """Rescale the image in a sample to a given size.
-
-#     Args:
-#         output_size (tuple or int): Desired output size. If tuple, output is
-#             matched to output_size. If int, smaller of image edges is matched
-#             to output_size keeping aspect ratio the same.
-#     """
-
-#     def __call__(self, sample):
-#         wf = sample
-#         w = wf.shape[0]
-
-#         mvn = MultivariateNormal(torch.zeros(w), torch.eye(w))
-#         noise_wf = mvn.sample()
-#         wf = wf + noise_wf
-
-#         return wf
-
-# class SmartNoise(object):
-#     """Rescale the image in a sample to a given size.
-
-#     Args:
-#         output_size (tuple or int): Desired output size. If tuple, output is
-#             matched to output_size. If int, smaller of image edges is matched
-#             to output_size keeping aspect ratio the same.
-#     """
-#     root_folder = '/Users/ankit/Documents/PaninskiLab/spike-psvae/notebook'
-#     cov_name = 'temporal_cov_example.npy'
-
-#     def __init__(self, temporal_cov=None):
-#         if temporal_cov is None:
-#             temporal_cov = np.load(self.root_folder + self.cov_name)
-#         # assert isinstance(temporal_cov, (float, array))
-#         self.temporal_cov = temporal_cov
-
-#     def __call__(self, sample):
-#         # wf = sample['wf']
-#         wf = sample
-#         w = wf.shape[0]
-
-#         assert self.temporal_cov.shape[0] == w
-
-#         mvn = MultivariateNormal(torch.zeros(w), self.temporal_cov)
-#         noise_wf = mvn.sample()
-#         wf = wf + noise_wf
-
-#         return wf
-
-# class Collide(object):
-#     """Rescale the image in a sample to a given size.
-
-#     Args:
-#         output_size (tuple or int): Desired output size. If tuple, output is
-#             matched to output_size. If int, smaller of image edges is matched
-#             to output_size keeping aspect ratio the same.
-#     """
-#     root_folder = '/Users/ankit/Documents/PaninskiLab/nyu47_templates/'
-#     temp_name = 'kilo_hptp_temps.npy'
-
-#     def __init__(self, templates=None):
-#         if templates is None:
-#             templates = np.load(self.root_folder+self.temp_name)
-#         # assert isinstance(templates, (array, array))
-#         self.templates = templates
-
-#     def __call__(self, sample):
-#         wf = sample['wf']
-#         w = wf.shape[0]
-
-#         temp_idx = torch.randint(0, len(self.templates), (1,))
-#         temp_sel = torch.from_numpy(self.templates[temp_idx])
-
-#         scale = Uniform(torch.tensor([0.2]), torch.tensor([1.0])).sample()
-#         offset = torch.randint(5, 60, (1,))
-#         shift = (torch.multiply(torch.tensor([2.0]), Bernoulli(torch.tensor([0.5])).sample()) - torch.tensor([1.0])).multiply(offset)
-
-#         temp_sel = temp_sel.multiply(scale)
-#         temp_sel = self.shift_chans(temp_sel, shift)
-
-#         wf = wf.add(temp_sel)
-
-#         return {'wf': wf}
-
-#     def shift_chans(wf, shift):
-#         # use template feat_channel shifts to interpolate shift of all spikes on all other chans
-#         int_shift = torch.ceil(shift) if shift.item() >= 0 else torch.floor(shift).multiply(-1)
-#         int_shift = int(int_shift.view())
-#         curr_wf_pos = F.pad(wf, (0, int_shift), 'constant') 
-#         curr_wf_neg = F.pad(wf, (int_shift, 0), 'constant')
-
-#         if shift > 0:
-#             wf_final = torch.roll(curr_wf_pos,int_shift,axis=0)[:-int_shift]
-#         else:
-#             wf_final = torch.roll(curr_wf_neg,int_shift,axis=0)[int_shift:]
-        
-#         return wf_final
-
-# class Jitter(object):
-#     """Rescale the image in a sample to a given size.
-
-#     Args:
-#         output_size (tuple or int): Desired output size. If tuple, output is
-#             matched to output_size. If int, smaller of image edges is matched
-#             to output_size keeping aspect ratio the same.
-#     """
-
-#     def __init__(self, templates=None, up_factor=8, sample_rate=20000):
-#         # assert isinstance(templates, (array, array))
-#         assert isinstance(up_factor, (int))
-#         assert isinstance(sample_rate, (int))
-#         self.templates = templates
-#         self.up_factor = up_factor
-#         self.sample_rate = sample_rate
-
-#     def __call__(self, sample):
-#         wf = sample['wf']
-#         w = wf.shape[0]
-
-#         resample = Resample(self.sample_rate, self.up_factor * self.sample_rate)
-#         wf_upsamp = resample(wf).t()
-
-#         # temp_idx = torch.randint(0, len(self.templates), (1,))
-#         # temp_sel = self.templates[temp_idx]
-
-#         idx = torch.arange(0, self.up_factor*w).reshape(-1, self.up_factor)
-#         up_shifted_wfs = wf_upsamp[idx]
-#         # up_shifted_temps.unsqueeze(1)
-#         # up_shifted_temps = torch.cat(
-#         #     (up_shifted_temps,temp_sel),
-#         #     axis=1)
-        
-#         offset = torch.randint(0, 3, (1,))
-#         shift = (torch.multiply(torch.tensor([2.0]), Bernoulli(torch.tensor([0.5])).sample()) - torch.tensor([1.0])).multiply(offset)
-
-#         idx_selection = torch.randint(self.up_factor)
-#         wf = up_shifted_wfs[idx_selection]
-#         wf = self.shift_chans(wf, shift)
-
-#         return wf
-
-#     def shift_chans(wf, shift):
-#         # use template feat_channel shifts to interpolate shift of all spikes on all other chans
-#         int_shift = torch.ceil(shift) if shift.item() >= 0 else torch.floor(shift).multiply(-1)
-#         int_shift = int(int_shift.view())
-#         curr_wf_pos = F.pad(wf, (0, int_shift), 'constant') 
-#         curr_wf_neg = F.pad(wf, (int_shift, 0), 'constant')
-
-#         if shift > 0:
-#             wf_final = torch.roll(curr_wf_pos,int_shift,axis=0)[:-int_shift]
-#         else:
-#             wf_final = torch.roll(curr_wf_neg,int_shift,axis=0)[int_shift:]
-        
-#         return wf_final
-    
-#     # def shift_chans(wfs, shifts):
-#     #     wfs_final= torch.zeros(wfs.size(), dtype=torch.float32)
-
-#     #     for k, shift in enumerate(shifts):
-#     #         wf = wf[k]
-#     #         # use template feat_channel shifts to interpolate shift of all spikes on all other chans
-#     #         int_shift = torch.ceil(shift) if shift.item() >= 0 else torch.floor(shift).multiply(-1)
-#     #         int_shift = int(int_shift.view())
-#     #         curr_wf_pos = F.pad(wf, (0, int_shift), 'constant') 
-#     #         curr_wf_neg = F.pad(wf, (int_shift, 0), 'constant')
-
-#     #         if shift > 0:
-#     #             wfs_final[k] = torch.roll(curr_wf_pos,int_shift,axis=0)[:-int_shift]
-#     #         else:
-#     #             wfs_final[k] = torch.roll(curr_wf_neg,int_shift,axis=0)[int_shift:]
-        
-#     #     return wfs_final
