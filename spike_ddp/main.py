@@ -23,6 +23,7 @@ from memory import build_mem
 
 from data_aug.contrastive_learning_dataset import ContrastiveLearningDataset, WFDataset_lab
 from models.model_GPT import GPTConfig, GPT, Projector
+from utils import knn_monitor
 
 # def main():
 #     args = parser.parse_args()
@@ -115,8 +116,17 @@ def main_worker(gpu, args):
         loader = torch.utils.data.DataLoader(
             dataset, batch_size=args.batch_size, num_workers=args.workers,
             pin_memory=True, drop_last=True)
+    
+    if args.rank == 0:
+        memory_dataset = WFDataset_lab(args.data, split='train', multi_chan=args.multi_chan)
+        memory_loader = torch.utils.data.DataLoader(
+            memory_dataset, batch_size=128, shuffle=False,
+            num_workers=args.workers, pin_memory=True, drop_last=False)
+        test_dataset = WFDataset_lab(args.data, split='test', multi_chan=args.multi_chan)
+        test_loader = torch.utils.data.DataLoader(
+            test_dataset, batch_size=args.batch_size, shuffle=False,
+            num_workers=args.workers, pin_memory=True, drop_last=False)
         
-
     start_time = time.time()
     scaler = torch.cuda.amp.GradScaler()
 
@@ -182,6 +192,12 @@ def main_worker(gpu, args):
             logger.log_value('loss', loss.item(), epoch)
             logger.log_value('acc', acc.item(), epoch)
             logger.log_value('learning_rate', lr, epoch)
+            
+            if epoch % args.knn_freq == 0:
+                knn_score = knn_monitor(net=model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True, args=args)
+                print(f"Epoch {epoch}, my knn_acc:{knn_score}")  
+                logger.log_value('knn_acc', knn_score, epoch)
+
 
     if args.rank == 0:
         # save final model
@@ -408,6 +424,8 @@ if __name__ == "__main__":
     parser.add_argument('--ddp', action='store_true') 
     parser.add_argument('--rank', default=0, type=int) 
     parser.add_argument('--num_extra_chans', default=0, type=int)
+    parser.add_argument('--knn-freq', default=1, type=int, metavar='N',
+                        help='save frequency')
     args = parser.parse_args()
     
     main(args)

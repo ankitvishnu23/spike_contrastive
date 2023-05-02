@@ -104,7 +104,8 @@ parser.add_argument('--vocab_size', default=50304, type=int) # default to GPT-2 
 parser.add_argument('--online_head', action='store_true') # default = False
 parser.add_argument('--ddp', action='store_true', default=True) 
 parser.add_argument('--num_extra_chans', default=0, type=int)
-
+parser.add_argument('--knn-freq', default=100, type=int, metavar='N',
+                        help='save frequency')
 class Trainer(object):
     def __init__(self, args):
         self.args = args

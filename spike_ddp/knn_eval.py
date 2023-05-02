@@ -12,6 +12,7 @@ from main import SimCLR
 from datasets import build_dataset
 import argparse
 import torch.nn.functional as F
+from data_aug.wf_data_augs import Crop
 
 def main(args):
     print("starting knn eval")
@@ -46,12 +47,12 @@ def main_worker(gpu, args):
 
     # define memory and test dataset for knn monitoring
     if not args.ddp:
-        memory_dataset = WFDataset_lab(args.data, split='train', multi_chan=args.multi_chan)
+        memory_dataset = WFDataset_lab(args.data, split='train', multi_chan=args.multi_chan, transform=Crop(prob=0.0, num_extra_chans=5))
         memory_loader = torch.utils.data.DataLoader(
             memory_dataset, batch_size=args.batch_size, shuffle=False,
             num_workers=args.workers, pin_memory=True, drop_last=False)
         
-        test_dataset = WFDataset_lab(args.data, split='test', multi_chan=args.multi_chan)
+        test_dataset = WFDataset_lab(args.data, split='test', multi_chan=args.multi_chan, transform=Crop(prob=0.0, num_extra_chans=5))
         test_loader = torch.utils.data.DataLoader(
             test_dataset, batch_size=args.batch_size, shuffle=False,
             num_workers=args.workers, pin_memory=True, drop_last=False)
@@ -111,7 +112,7 @@ def make_sh_and_submit(args):
 if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='PyTorch SimCLR')
-    parser.add_argument('--data', type=Path, metavar='DIR', default= '/gpfs/u/home/BNSS/BNSSlhch/scratch/spike_contrastive/dy016',
+    parser.add_argument('--data', type=Path, metavar='DIR', default= '/gpfs/u/home/BNSS/BNSSlhch/scratch/spike_data/multi_dy016_random_neurons_04_28_2023',
                         help='path to dataset')
     parser.add_argument('-dataset-name', default='wfs',
                         help='dataset name', choices=['wfs', 'stl10', 'cifar10'])
@@ -197,4 +198,10 @@ python knn_eval.py --checkpoint-dir=/gpfs/u/home/BNSS/BNSSlhch/scratch/spike_ddp
 Epoch 800, my knn_acc:65.13333333333333
 Epoch 791, my knn_acc:65.3
 Epoch 701, my knn_acc:62.133333333333326
+
+
+New runs:
+python knn_eval.py --checkpoint-dir=/gpfs/u/home/BNSS/BNSSlhch/scratch/spike_ddp/saved_models/0501_mc_gpt_conseq_causal_nembd64_block1331_bs128_extra5_lr0.0001/checkpoint.pth --multi_chan --is_causal --batch-size=128 --n_embd=64
+python knn_eval.py --checkpoint-dir=/gpfs/u/home/BNSS/BNSSlhch/scratch/spike_ddp/saved_models/0501_mc_gpt_conseq_causal_nembd64_block1331_bs128_extra5_lr0.001/checkpoint.pth --multi_chan --is_causal --batch-size=128 --n_embd=64
+
 """
