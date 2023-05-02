@@ -207,7 +207,7 @@ if __name__ == "__main__":
                         help='dataset name', choices=['wfs', 'stl10', 'cifar10'])
     parser.add_argument('--optimizer', default='adam', choices = ['adam', 'sgd'],
                         help='optimizer')
-    parser.add_argument('-a', '--arch', metavar='ARCH', default='custom_encoder',
+    parser.add_argument('-a', '--arch', metavar='ARCH', default='attention',
                         help='default: custom_encoder)')
     parser.add_argument('-ns', '--noise_scale', default=1.0,
                         help='how much to scale the noise augmentation (default: 1)')

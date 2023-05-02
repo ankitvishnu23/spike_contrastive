@@ -218,3 +218,29 @@ python run.py --out_dim=5 --proj_dim=5 --batch-size=128 --lr=0.001 --arch=attent
 
 python run.py --out_dim=5 --proj_dim=5 --batch-size=128 --lr=0.001 --arch=attention --epochs=800 --fp16 --use_gpt --is_causal --n_embd=64 --exp=gpt_bs128_lr0.001_n64
 
+python run.py --out_dim=5 --proj_dim=5 --batch-size=128 --lr=0.001 --arch=attention --epochs=800 --fp16 --use_gpt --is_causal --n_embd=64 --exp=test
+
+for bs in 512 128
+do
+for lr in 0.001 0.005 0.0003
+do
+for nembd in 32 64
+do
+python run.py --add_prefix=0501 --submit --arg_str="--out_dim=5 --proj_dim=5 --batch-size=${bs} --lr=${lr} --epochs=800 --fp16 --use_gpt --is_causal --n_embd=${nembd} "
+done
+done
+done
+
+for bs in 512 
+do
+for lr in 0.001 0.005 0.0003
+do
+for nembd in 32 
+do
+for dim in 2 11
+do
+python run.py --add_prefix=0501 --submit --arg_str="--out_dim=${dim} --proj_dim=${dim} --batch-size=${bs} --lr=${lr} --epochs=800 --fp16 --use_gpt --is_causal --n_embd=${nembd} "
+done
+done
+done
+done

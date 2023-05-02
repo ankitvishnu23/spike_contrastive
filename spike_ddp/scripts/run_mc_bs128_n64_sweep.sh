@@ -10,11 +10,11 @@ source ${CONDA_ROOT}/etc/profile.d/conda.sh
 conda activate $PYTHON_VIRTUAL_ENVIRONMENT
 ulimit -s unlimited
 
-for lr in 0.003 0.0003
+for lr in 0.001 0.005 0.0001
 do
 python \
       $HOME2/scratch/spike_ddp/launcher.py \
-      --data $HOME2/scratch/spike_contrastive/dy016 \
+      --data $HOME2/scratch/spike_data/multi_dy016_random_neurons_04_28_2023 \
       --workers 32 \
       --epochs 800 \
       --batch-size 128 \
@@ -26,12 +26,14 @@ python \
       --log-dir $HOME2/scratch/spike_ddp/logs/ \
       --ngpus-per-node 4 \
       --nodes 4 \
-      --exp mc_gpt_posseq_causal_nembd64_block1331_bs132_lr${lr} \
+      --exp 0501_mc_gpt_conseq_causal_nembd64_block1331_bs128_extra5_lr${lr} \
       --block_size 1331 \
       --n_embd 64 \
       --multi_chan \
-      --pos_enc seq_11times \
-      --is_causal 
+      --pos_enc conseq \
+      --is_causal \
+      --num_extra_chans 5
+
 done
 echo "Run completed at:- "
 date
