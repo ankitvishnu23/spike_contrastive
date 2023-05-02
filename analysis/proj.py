@@ -17,7 +17,7 @@ def pca_train(train, test, n_comps):
 
 def pca(S, n_comps):
     pca_ = PCA(n_components=n_comps, whiten=True)
-    return pca_.fit_transform(S), pca_.explained_variance_ratio_
+    return pca_.fit_transform(S), pca_.explained_variance_ratio_, pca_
 
 # og_pca, og_pca_var = pca(max_chan_hptp_temps, 2)
 # tform_pca, tform_var = pca(tform_temps_numpy, 2)
