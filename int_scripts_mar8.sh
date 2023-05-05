@@ -244,3 +244,31 @@ done
 done
 done
 done
+
+for bs in 512 
+do
+for lr in 0.001 0.0003
+do
+for nembd in 32 
+do
+for dim in 2 5 11
+do
+python run.py --add_prefix=0504 --submit --arg_str="--out_dim=${dim} --proj_dim=${dim} --batch-size=${bs} --lr=${lr} --epochs=800 --fp16 --use_gpt --is_causal --n_embd=${nembd} --add_train "
+done
+done
+done
+done
+
+for bs in 512 
+do
+for lr in 0.001 
+do
+for nembd in 32 
+do
+for dim in 5
+do
+python run.py --add_prefix=0505 --submit --arg_str="--out_dim=${dim} --proj_dim=${dim} --batch-size=${bs} --lr=${lr} --epochs=800 --fp16 --use_gpt --is_causal --n_embd=${nembd} --eval_knn_every_n_epochs=790 "
+done
+done
+done
+done

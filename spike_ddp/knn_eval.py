@@ -35,7 +35,7 @@ def main_worker(gpu, args):
 
 
     # dataset = ContrastiveLearningDataset(args.data, args.out_dim, multi_chan=args.multi_chan, no_collide=args.no_collide)
-    dataset = ContrastiveLearningDataset(args.data, args.out_dim, multi_chan=args.multi_chan)
+    # dataset = ContrastiveLearningDataset(args.data, args.out_dim, multi_chan=args.multi_chan)
 
     # train_dataset = dataset.get_dataset('wfs', 2, args.noise_scale)
     
@@ -47,21 +47,41 @@ def main_worker(gpu, args):
 
     # define memory and test dataset for knn monitoring
     if not args.ddp:
-        memory_dataset = WFDataset_lab(args.data, split='train', multi_chan=args.multi_chan, transform=Crop(prob=0.0, num_extra_chans=5))
-        memory_loader = torch.utils.data.DataLoader(
-            memory_dataset, batch_size=args.batch_size, shuffle=False,
-            num_workers=args.workers, pin_memory=True, drop_last=False)
+        if args.multi_chan:
+            memory_dataset = WFDataset_lab(args.data, split='train', multi_chan=args.multi_chan, transform=Crop(prob=0.0, num_extra_chans=5, ignore_chan_num=True))
+            memory_loader = torch.utils.data.DataLoader(
+                memory_dataset, batch_size=128, shuffle=False,
+                num_workers=args.workers, pin_memory=True, drop_last=False)
+            test_dataset = WFDataset_lab(args.data, split='test', multi_chan=args.multi_chan, transform=Crop(prob=0.0, num_extra_chans=5, ignore_chan_num=True))
+            test_loader = torch.utils.data.DataLoader(
+                test_dataset, batch_size=args.batch_size, shuffle=False,
+                num_workers=args.workers, pin_memory=True, drop_last=False)
+        else:
+            memory_dataset = WFDataset_lab(args.data, split='train', multi_chan=False)
+            memory_loader = torch.utils.data.DataLoader(
+                memory_dataset, batch_size=128, shuffle=False,
+                num_workers=args.workers, pin_memory=True, drop_last=False)
+            test_dataset = WFDataset_lab(args.data, split='test', multi_chan=False)
+            test_loader = torch.utils.data.DataLoader(
+                test_dataset, batch_size=args.batch_size, shuffle=False,
+                num_workers=args.workers, pin_memory=True, drop_last=False)
         
-        test_dataset = WFDataset_lab(args.data, split='test', multi_chan=args.multi_chan, transform=Crop(prob=0.0, num_extra_chans=5))
-        test_loader = torch.utils.data.DataLoader(
-            test_dataset, batch_size=args.batch_size, shuffle=False,
-            num_workers=args.workers, pin_memory=True, drop_last=False)
+        # memory_dataset = WFDataset_lab(args.data, split='train', multi_chan=args.multi_chan, transform=Crop(prob=0.0, num_extra_chans=5, ignore_chan_num=True))
+        # memory_loader = torch.utils.data.DataLoader(
+        #     memory_dataset, batch_size=args.batch_size, shuffle=False,
+        #     num_workers=args.workers, pin_memory=True, drop_last=False)
+        
+        # test_dataset = WFDataset_lab(args.data, split='test', multi_chan=args.multi_chan, transform=Crop(prob=0.0, num_extra_chans=5, ignore_chan_num=True))
+        # test_loader = torch.utils.data.DataLoader(
+        #     test_dataset, batch_size=args.batch_size, shuffle=False,
+        #     num_workers=args.workers, pin_memory=True, drop_last=False)
     else:
         memory_loader = None
         test_loader = None
     
     model = SimCLR(args).cuda(gpu)
-    
+    # print("current model")
+    # print(model.state_dict().keys())
 
     if not os.path.exists(args.checkpoint_dir):
         raise ValueError("Checkpoint not found")
@@ -71,12 +91,14 @@ def main_worker(gpu, args):
                           map_location='cpu')
         start_epoch = ckpt['epoch']
         nonddp_state_dict = {k.replace('module.', ''): v for k, v in ckpt['model'].items()}
+        # print("from file")
+        # print(nonddp_state_dict.keys())
+        
         model.load_state_dict(nonddp_state_dict)
 
     knn_score = knn_monitor(net=model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True, args=args)
-    print(f"Epoch {start_epoch}, my knn_acc:{knn_score}")  
+    print(f"Epoch {start_epoch}, knn_acc:{knn_score}")  
 
-    
 def make_sh_and_submit(args):
     os.makedirs('./scripts/', exist_ok=True)
     os.makedirs('./logs/', exist_ok=True)
@@ -184,6 +206,7 @@ if __name__ == "__main__":
     parser.add_argument('--online_head', action='store_true') # default = False
     parser.add_argument('--pos_enc', default ='seq_11times', type=str)    
     parser.add_argument('--no_collide', action='store_true') # default = False
+    parser.add_argument('--ignore_proj', action='store_true') # default = False
     
     args = parser.parse_args()
     
@@ -203,5 +226,7 @@ Epoch 701, my knn_acc:62.133333333333326
 New runs:
 python knn_eval.py --checkpoint-dir=/gpfs/u/home/BNSS/BNSSlhch/scratch/spike_ddp/saved_models/0501_mc_gpt_conseq_causal_nembd64_block1331_bs128_extra5_lr0.0001/checkpoint.pth --multi_chan --is_causal --batch-size=128 --n_embd=64
 python knn_eval.py --checkpoint-dir=/gpfs/u/home/BNSS/BNSSlhch/scratch/spike_ddp/saved_models/0501_mc_gpt_conseq_causal_nembd64_block1331_bs128_extra5_lr0.001/checkpoint.pth --multi_chan --is_causal --batch-size=128 --n_embd=64
+python knn_eval.py --checkpoint-dir=/gpfs/u/home/BNSS/BNSSlhch/scratch/spike_ddp/saved_models/0502_mc_gpt_conseq_causal_nembd64_block1331_bs128_extra5_lr0.0001_knn10_addtrain/checkpoint.pth --multi_chan --is_causal --batch-size=128 --n_embd=64
+
 
 """

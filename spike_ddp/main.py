@@ -24,6 +24,7 @@ from memory import build_mem
 from data_aug.contrastive_learning_dataset import ContrastiveLearningDataset, WFDataset_lab
 from models.model_GPT import GPTConfig, GPT, Projector
 from utils import knn_monitor
+from data_aug.wf_data_augs import Crop
 
 # def main():
 #     args = parser.parse_args()
@@ -118,19 +119,31 @@ def main_worker(gpu, args):
             pin_memory=True, drop_last=True)
     
     if args.rank == 0:
-        memory_dataset = WFDataset_lab(args.data, split='train', multi_chan=args.multi_chan)
-        memory_loader = torch.utils.data.DataLoader(
-            memory_dataset, batch_size=128, shuffle=False,
-            num_workers=args.workers, pin_memory=True, drop_last=False)
-        test_dataset = WFDataset_lab(args.data, split='test', multi_chan=args.multi_chan)
-        test_loader = torch.utils.data.DataLoader(
-            test_dataset, batch_size=args.batch_size, shuffle=False,
-            num_workers=args.workers, pin_memory=True, drop_last=False)
+        if args.multi_chan:
+            memory_dataset = WFDataset_lab(args.data, split='train', multi_chan=args.multi_chan, transform=Crop(prob=0.0, num_extra_chans=5, ignore_chan_num=True))
+            memory_loader = torch.utils.data.DataLoader(
+                memory_dataset, batch_size=128, shuffle=False,
+                num_workers=args.workers, pin_memory=True, drop_last=False)
+            test_dataset = WFDataset_lab(args.data, split='test', multi_chan=args.multi_chan, transform=Crop(prob=0.0, num_extra_chans=5, ignore_chan_num=True))
+            test_loader = torch.utils.data.DataLoader(
+                test_dataset, batch_size=args.batch_size, shuffle=False,
+                num_workers=args.workers, pin_memory=True, drop_last=False)
+        else:
+            memory_dataset = WFDataset_lab(args.data, split='train', multi_chan=False)
+            memory_loader = torch.utils.data.DataLoader(
+                memory_dataset, batch_size=128, shuffle=False,
+                num_workers=args.workers, pin_memory=True, drop_last=False)
+            test_dataset = WFDataset_lab(args.data, split='test', multi_chan=False)
+            test_loader = torch.utils.data.DataLoader(
+                test_dataset, batch_size=args.batch_size, shuffle=False,
+                num_workers=args.workers, pin_memory=True, drop_last=False)
         
     start_time = time.time()
     scaler = torch.cuda.amp.GradScaler()
 
     for epoch in range(start_epoch, args.epochs):
+        if args.add_train:
+            model.train()
         if args.ddp:
             sampler.set_epoch(epoch)
 
@@ -426,6 +439,8 @@ if __name__ == "__main__":
     parser.add_argument('--num_extra_chans', default=0, type=int)
     parser.add_argument('--knn-freq', default=1, type=int, metavar='N',
                         help='save frequency')
+    parser.add_argument('--add_train', action='store_true') # default = False
+    
     args = parser.parse_args()
     
     main(args)

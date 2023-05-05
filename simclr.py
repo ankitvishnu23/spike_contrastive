@@ -101,11 +101,13 @@ class SimCLR(object):
         pca_score = 0
 
         for epoch_counter in range(self.start_epoch, self.args.epochs):
+            if self.args.add_train:
+                self.model.train()
             start_time = time.time()
             if self.args.ddp:
                 self.sampler.set_epoch(epoch_counter)
             print('Epoch {}'.format(epoch_counter))
-            time4 = time.time()
+            # time4 = time.time()
             for i, (wf, lab) in enumerate(train_loader):
                 # print(f"batch {i}")
                 wf = torch.cat(wf, dim=0).float()

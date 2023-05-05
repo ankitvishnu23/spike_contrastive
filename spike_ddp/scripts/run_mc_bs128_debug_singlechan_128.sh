@@ -17,7 +17,7 @@ python \
       --data $HOME2/scratch/spike_data/single_dy016_random_neurons_04_28_2023 \
       --workers 32 \
       --epochs 800 \
-      --batch-size 512 \
+      --batch-size 128 \
       --out_dim 5 \
       --proj_dim 5 \
       --optimizer adam \
@@ -26,7 +26,7 @@ python \
       --log-dir $HOME2/scratch/spike_ddp/logs/ \
       --ngpus-per-node 4 \
       --nodes 2 \
-      --exp 0502_single_block121_bs512_lr${lr}_8gpu \
+      --exp 0502_single_block121_bs128_lr${lr}_8gpu \
       --block_size 121 \
       --n_embd 64 \
       --pos_enc conseq \
