@@ -276,9 +276,10 @@ class Jitter(object):
     
 
 class Crop(object):
-    def __init__(self, prob=0.5, num_extra_chans=2):
+    def __init__(self, prob=0.5, num_extra_chans=2, ignore_chan_num=False):
         self.prob = prob
         self.num_extra_chans = num_extra_chans
+        self.ignore_chan_num = ignore_chan_num
         
     def __call__(self, sample):
         if len(sample) == 2:
@@ -298,12 +299,16 @@ class Crop(object):
             shift = np.random.randint(-self.num_extra_chans, self.num_extra_chans+1)
             max_chan_ind += shift
         wf = wf[max_chan_ind-self.num_extra_chans:max_chan_ind+self.num_extra_chans+1]
-        if type(chan_nums) != np.int64: 
-            chan_nums = chan_nums[max_chan_ind-self.num_extra_chans:max_chan_ind+self.num_extra_chans+1]
+        
+        if not self.ignore_chan_num:
+            if type(chan_nums) != np.int64: 
+                chan_nums = chan_nums[max_chan_ind-self.num_extra_chans:max_chan_ind+self.num_extra_chans+1]
         # in single channel case the wf will become 1 dimensional
         if len(wf.shape) == 1:
             wf = np.expand_dims(wf, axis=0)
-
+        if self.ignore_chan_num:
+            return wf
+        
         return [wf, chan_nums]
 
 
@@ -333,8 +338,7 @@ class PCA_Reproj(object):
         recon = self.pca_.inverse_transform(transform)[0]
 
         return recon
-    
-    
+
 class ElectrodeDropout(object):
     def __init__(self, prob=0.1):
         self.p_drop_chan = prob
@@ -345,9 +349,7 @@ class ElectrodeDropout(object):
         print(chan_mask)
         
         wf[chan_mask == 0] = np.zeros(n_times)
-
         return wf
-    
     
 class ToWfTensor(object):
     """Convert ndarrays in sample to Tensors."""

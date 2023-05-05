@@ -12,7 +12,7 @@ from torchvision import models
 from data_aug.contrastive_learning_dataset import ContrastiveLearningDataset, WFDataset_lab
 from models.model_simclr import ModelSimCLR, Projector, Projector2
 from simclr import SimCLR
-from models.model_GPT import GPTConfig, GPT
+from models.model_GPT import GPTConfig, Single_GPT
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 
@@ -111,7 +111,7 @@ def main_worker(gpu, args):
                   bias=args.bias, vocab_size=args.vocab_size, dropout=args.dropout, out_dim=args.out_dim, is_causal=args.is_causal, 
                   proj_dim=args.proj_dim, pos=args.pos_enc, multi_chan=args.multi_chan) 
         gptconf = GPTConfig(**model_args)
-        model = GPT(gptconf).cuda(gpu)
+        model = Single_GPT(gptconf).cuda(gpu)
     else:
         model = ModelSimCLR(base_model=args.arch, out_dim=args.out_dim, proj_dim=args.proj_dim, \
             fc_depth=args.fc_depth, expand_dim=args.expand_dim, multichan=args.multi_chan).cuda(gpu)

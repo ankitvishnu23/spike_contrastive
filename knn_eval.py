@@ -6,10 +6,9 @@ import torch
 import torch.nn.functional as F
 import torch.multiprocessing as mp
 import torch.distributed as dist
-from utils import knn_monitor
+from ddp_utils import knn_monitor
 from data_aug.contrastive_learning_dataset import ContrastiveLearningDataset, WFDataset_lab
 from main import SimCLR
-from datasets import build_dataset
 import argparse
 import torch.nn.functional as F
 from data_aug.wf_data_augs import Crop

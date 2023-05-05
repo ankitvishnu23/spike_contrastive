@@ -11,74 +11,60 @@ import argparse
 logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
 _logger = logging.getLogger('train')
 
-parser = argparse.ArgumentParser(description='DDP spikes training')
-parser.add_argument('--data', metavar='DIR', default='/home/gridsan/cloh/spike_contrastive/dy016/',
+parser = argparse.ArgumentParser(description='SimCLR Training')
+parser.add_argument('--data', type=Path, metavar='DIR',
                     help='path to dataset')
-parser.add_argument('-dataset-name', default='wfs',
-                    help='dataset name', choices=['wfs', 'stl10', 'cifar10'])
-parser.add_argument('--optimizer', default='adam', choices = ['adam', 'sgd'],
-                    help='optimizer')
-parser.add_argument('-a', '--arch', metavar='ARCH', default='custom_encoder',
-                    help='default: custom_encoder)')
-parser.add_argument('-ns', '--noise_scale', default=1.0,
-                    help='how much to scale the noise augmentation (default: 1)')
-parser.add_argument('-j', '--workers', default=12, type=int, metavar='N',
-                    help='number of data loading workers (default: 32)')
-parser.add_argument('--epochs', default=300, type=int, metavar='N',
+parser.add_argument('--dataset', type=str, default='imagenet', choices=['imagenet', 'cifar100'],
+                    help='dataset (imagenet, cifar100)')
+parser.add_argument('--workers', default=8, type=int, metavar='N',
+                    help='number of data loader workers')
+parser.add_argument('--epochs', default=800, type=int, metavar='N',
                     help='number of total epochs to run')
-parser.add_argument('-b', '--batch-size', default=1024, type=int,
-                    metavar='N',
-                    help='mini-batch size (default: 256), this is the total '
-                        'batch size of all GPUs on the current node when '
-                        'using Data Parallel or Distributed Data Parallel')
-parser.add_argument('--lr', '--learning-rate', default=0.001, type=float,
-                    metavar='LR', help='initial learning rate', dest='lr')
-parser.add_argument('--wd', '--weight-decay', default=1e-4, type=float,
-                    metavar='W', help='weight decay (default: 1e-4)',
-                    dest='weight_decay')
-parser.add_argument('--seed', default=None, type=int,
-                    help='seed for initializing training. ')
-parser.add_argument('--disable-cuda', action='store_true',
-                    help='Disable CUDA')
-parser.add_argument('--fp16', action='store_true',
-                    help='Whether or not to use 16-bit precision GPU training.')
-parser.add_argument('--out_dim', default=5, type=int,
-                    help='feature dimension (default: 2)')
-parser.add_argument('--proj_dim', default=5, type=int,
-                    help='projection dimension (default: 5)')
-parser.add_argument('--log-every-n-steps', default=100, type=int,
-                    help='Log every n steps')
-parser.add_argument('--temperature', default=0.07, type=float,
-                    help='softmax temperature (default: 0.07)')
-parser.add_argument('--n-views', default=2, type=int, metavar='N',
-                    help='Number of views for contrastive learning training.')
-parser.add_argument('--gpu-index', default=0, type=int, help='Gpu index.')
-parser.add_argument('--fc_depth', default=2, type=int)
-parser.add_argument('--submit', action='store_true')
-parser.add_argument('--arg_str', default='--', type=str)
-parser.add_argument('--add_prefix', default='', type=str)
-parser.add_argument('--no_proj', default='True', action='store_true')
-parser.add_argument('--expand_dim', default=16, type=int)
-parser.add_argument('--multi_chan', default=False, action='store_true')
-parser.add_argument('--n_channels', default=11, type=int)
-parser.add_argument('--ddp', default=True, action='store_true')
-parser.add_argument('--eval_knn_every_n_epochs', default=1000, type=int)
+parser.add_argument('--batch-size', default=4096, type=int, metavar='N',
+                    help='mini-batch size')
+parser.add_argument('--learning-rate', default=4.8, type=float, metavar='LR',
+                    help='base learning rate')
+parser.add_argument('--weight-decay', default=1e-6, type=float, metavar='W',
+                    help='weight decay')
+parser.add_argument('--print-freq', default=10, type=int, metavar='N',
+                    help='print frequency')
+parser.add_argument('--save-freq', default=10, type=int, metavar='N',
+                    help='save frequency')
+parser.add_argument('--topk-path', type=str, default='./imagenet_resnet50_top10.pkl',
+                    help='path to topk predictions from pre-trained classifier')
+parser.add_argument('--checkpoint-dir', type=Path,
+                    metavar='DIR', help='path to checkpoint directory')
+parser.add_argument('--log-dir', type=Path,
+                    metavar='LOGDIR', help='path to tensorboard log directory')
+parser.add_argument('--rotation', default=0.0, type=float,
+                    help="coefficient of rotation loss")
+parser.add_argument('--scale', default='0.05,0.14', type=str)
+parser.add_argument("--seed", default=42, type=int,
+                    help="seed")
 
-parser.add_argument('--use_gpt', action='store_true') # default = False
+# Training / loss specific parameters
+parser.add_argument('--temp', default=0.2, type=float,
+                    help='Temperature for InfoNCE loss')
+parser.add_argument('--mask-mode', type=str, default='',
+                    help='Masking mode (masking out only positives, masking out all others than the topk classes',
+                    choices=['pos', 'supcon', 'supcon_all', 'topk', 'topk_sum', 'topk_agg_sum', 'weight_anchor_logits', 'weight_class_logits'])
+parser.add_argument('--topk', default=5, type=int, metavar='K',
+                    help='Top k classes to use')
+parser.add_argument('--topk-only-first', action='store_true', default=False,
+                    help='Whether to only use the first block of anchors')
+parser.add_argument('--memory-bank', action='store_true', default=False,
+                    help='Whether to use memory bank')
+parser.add_argument('--mem-size', default=100000, type=int,
+                    help='Size of memory bank')
+parser.add_argument('--opt-momentum', default=0.9, type=float,
+                    help='Momentum for optimizer')
+parser.add_argument('--optimizer', default='adam', type=str,
+                    help='Optimizer', choices=['lars', 'sgd', 'adam'])
 
-parser.add_argument('--n_layer', default=20, type=int)
-parser.add_argument('--n_head', default=4, type=int)
-parser.add_argument('--n_embd', default=64, type=int)
-parser.add_argument('--is_causal', action='store_true') # default = False
-# parser.add_argument('--block_size', default=2678, type=int) # this is the max sequence length
-parser.add_argument('--block_size', default=1331, type=int) # this is the max sequence length
+# Transform
+parser.add_argument('--weak-aug', action='store_true', default=False,
+                    help='Whether to use augmentation reguarlization (strong & weak augmentation)')
 
-parser.add_argument('--dropout', default=0.2, type=float)
-parser.add_argument('--bias', action='store_true') # default = False
-parser.add_argument('--vocab_size', default=50304, type=int) # default to GPT-2 vocab size
-
-parser.add_argument('--online_head', action='store_true', default=True) # default = True
-    
 # Slurm setting
 parser.add_argument('--ngpus-per-node', default=6, type=int, metavar='N',
                     help='number of gpus per node')
@@ -89,20 +75,47 @@ parser.add_argument("--timeout", default=360, type=int,
 parser.add_argument("--partition", default="el8", type=str,
                     help="Partition where to submit")
 
-parser.add_argument('--exp', default='test', type=str)
-parser.add_argument('--checkpoint-dir', type=Path,
-                    metavar='DIR', help='path to checkpoint directory')
-parser.add_argument('--log-dir', type=Path,
-                    metavar='LOGDIR', help='path to tensorboard log directory')
+parser.add_argument("--exp", default="SimCLR", type=str,
+                    help="Name of experiment")
+
+# new params
+parser.add_argument('--out_dim', default=5, type=int,
+                        help='feature dimension (default: 5)')
+parser.add_argument('--proj_dim', default=5, type=int,
+                    help='projection dimension (default: 5)')
+
+parser.add_argument('--use_gpt', action='store_true') # default = False
+parser.add_argument('-ns', '--noise_scale', default=1.0,
+                        help='how much to scale the noise augmentation (default: 1)')
+   
+# GPT args
+parser.add_argument('--n_layer', default=20, type=int)
+parser.add_argument('--n_head', default=4, type=int)
+parser.add_argument('--n_embd', default=64, type=int)
+parser.add_argument('--is_causal', action='store_true') # default = False
+# parser.add_argument('--block_size', default=2678, type=int) # this is the max sequence length
+parser.add_argument('--block_size', default=121, type=int) # this is the max sequence length
+parser.add_argument('--pos_enc', default ='seq_11times', type=str)    
+parser.add_argument('--multi_chan', default=False, action='store_true')
+
+parser.add_argument('--dropout', default=0.2, type=float)
+parser.add_argument('--bias', action='store_true') # default = False
+parser.add_argument('--vocab_size', default=50304, type=int) # default to GPT-2 vocab size
+parser.add_argument('--online_head', action='store_true') # default = False
+parser.add_argument('--ddp', action='store_true', default=True) 
+parser.add_argument('--num_extra_chans', default=0, type=int)
+parser.add_argument('--knn-freq', default=100, type=int, metavar='N',
+                        help='save frequency')
+parser.add_argument('--add_train', action='store_true') # default = False
 
 class Trainer(object):
     def __init__(self, args):
         self.args = args
 
     def __call__(self):
-        import run
+        import main
         self._setup_gpu_args()
-        run.main_worker(self.args.gpu, self.args)
+        main.main_worker(self.args.gpu, self.args)
 
     def checkpoint(self):
         import os
@@ -137,6 +150,7 @@ def get_init_file(args):
 
 def main():
     args = parser.parse_args()
+    args.scale = [float(x) for x in args.scale.split(',')]
 
     args.checkpoint_dir = args.checkpoint_dir / args.exp
     args.log_dir = args.log_dir / args.exp

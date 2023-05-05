@@ -13,17 +13,14 @@ import numpy as np
 from torch import nn, optim
 import torch
 import torch.distributed as dist
-import torchvision
 
 import tensorboard_logger as tb_logger
 
-from utils import gather_from_all
-from datasets import build_dataset
-from memory import build_mem
+from ddp_utils import gather_from_all
 
 from data_aug.contrastive_learning_dataset import ContrastiveLearningDataset, WFDataset_lab
-from models.model_GPT import GPTConfig, GPT, Projector
-from utils import knn_monitor
+from models.model_GPT import GPTConfig, Multi_GPT, Projector
+from ddp_utils import knn_monitor
 from data_aug.wf_data_augs import Crop
 
 # def main():
@@ -244,7 +241,7 @@ class SimCLR(nn.Module):
                   bias=args.bias, vocab_size=args.vocab_size, dropout=args.dropout, out_dim=args.out_dim, is_causal=args.is_causal, 
                   proj_dim=args.proj_dim, pos=args.pos_enc, multi_chan=args.multi_chan) 
         gptconf = GPTConfig(**model_args)
-        self.backbone = GPT(gptconf)
+        self.backbone = Multi_GPT(gptconf)
         self.args = args
         
         # projector
