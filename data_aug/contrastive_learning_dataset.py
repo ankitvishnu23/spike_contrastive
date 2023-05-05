@@ -66,8 +66,9 @@ class WFDataset(Dataset):
 
 
 class WF_MultiChan_Dataset(Dataset):
-    filename = "multichan_spikes_train.npy"
-    multi_chan_mcs = "multichan_channel_num_train.npy"
+    filename = "spikes_train.npy"
+    multi_chan_mcs_fn = "channel_num_train.npy"
+    targets_fn = "labels_train.npy"
 
     def __init__(
         self,
@@ -84,10 +85,9 @@ class WF_MultiChan_Dataset(Dataset):
         self.data = np.load(os.path.join(root, self.filename))
         print(self.data.shape)
         self.root = root
-        self.chan_nums = np.load(os.path.join(root, self.multi_chan_mcs))
+        self.chan_nums = np.load(os.path.join(root, self.multi_chan_mcs_fn))
         self.transform = transform
-        self.targets = np.array([[i for j in range(1200)] \
-                                for i in range(10)]).reshape(-1).astype('long')
+        self.targets = np.load(os.path.join(root, self.targets_fn))
         self.target_transform = target_transform
 
     def __getitem__(self, index: int) -> Any :
@@ -130,19 +130,13 @@ class WFDataset_lab(Dataset):
 
         super().__init__()
         if split == 'train':
-            if multi_chan == False:
-                self.filename = "spikes_train.npy"
-            else:
-                self.filename = "multichan_spikes_train.npy"
+            self.filename = "spikes_train.npy"
             print(multi_chan, self.filename)
             self.data = np.load(os.path.join(root, self.filename)).astype('float32')
             self.targets = np.array([[i for j in range(1200)] \
                                 for i in range(10)]).reshape(-1).astype('long')
         elif split == 'test':
-            if multi_chan == False:
-                self.filename = "spikes_test.npy"
-            else:
-                self.filename = "multichan_spikes_test.npy"
+            self.filename = "spikes_test.npy"
             self.data = np.load(os.path.join(root, self.filename)).astype('float32')
             self.targets = np.array([[i for j in range(300)] \
                                 for i in range(10)]).reshape(-1).astype('long')
