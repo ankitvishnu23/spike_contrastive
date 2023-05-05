@@ -223,7 +223,7 @@ class ContrastiveLearningDataset:
                                                                 #   noise_scale), self.get_pca_transform(self),
                                                                   noise_scale, 0), None,
                                                                   n_views),
-                                                                  target_transform=LabelViewGenerator()),
+                                                              target_transform=LabelViewGenerator()),
                           'wfs_multichan': lambda: WF_MultiChan_Dataset(self.root_folder,
                                                               transform=ContrastiveLearningViewGenerator(
                                                                   self.get_wf_pipeline_transform(self, temp_cov_fn,
@@ -231,7 +231,7 @@ class ContrastiveLearningDataset:
                                                                 #   noise_scale), self.get_pca_transform(self),
                                                                   noise_scale, num_extra_chans), None,
                                                                   n_views),
-                                                                  target_transform=LabelViewGenerator()),
+                                                              target_transform=LabelViewGenerator()),
                           'cifar10': lambda: datasets.CIFAR10(self.root_folder, train=True,
                                                               transform=ContrastiveLearningViewGenerator(
                                                                   self.get_simclr_pipeline_transform(32),
