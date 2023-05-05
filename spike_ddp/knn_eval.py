@@ -97,7 +97,49 @@ def main_worker(gpu, args):
         model.load_state_dict(nonddp_state_dict)
 
     knn_score = knn_monitor(net=model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True, args=args)
-    print(f"Epoch {start_epoch}, knn_acc:{knn_score}")  
+    print(f"Epoch {start_epoch}, knn_acc:{knn_score}")
+      
+    # save representations
+    ckpt_root_dir = '/'.join(args.checkpoint_dir.split('/')[:-1])
+    # model_name = args.checkpoint_dir.split('/')[-2]
+    model.eval()
+    feature_bank = []
+    with torch.no_grad():
+        for data, target in test_loader:
+            if not args.multi_chan:
+                data = torch.squeeze(data, dim=1)
+                data = torch.unsqueeze(data, dim=-1)
+            else:
+                data = data.view(-1, 11*121)
+                data = torch.unsqueeze(data, dim=-1)
+            
+            feature = model(data.cuda(gpu, non_blocking=True))
+            feature_bank.append(feature)
+            
+        feature_bank = torch.cat(feature_bank, dim=0)
+        print(feature_bank.shape)
+        
+        torch.save(feature_bank, os.path.join(ckpt_root_dir, 'test_reps.pt'))
+        print(f"saved test features to {ckpt_root_dir}/test_reps.pt")
+    
+    feature_bank = []
+    with torch.no_grad():
+        for data, target in memory_loader:
+            if not args.multi_chan:
+                data = torch.squeeze(data, dim=1)
+                data = torch.unsqueeze(data, dim=-1)
+            else:
+                data = data.view(-1, 11*121)
+                data = torch.unsqueeze(data, dim=-1)
+            
+            feature = model(data.cuda(gpu, non_blocking=True))
+            feature_bank.append(feature)
+            
+        feature_bank = torch.cat(feature_bank, dim=0)
+        print(feature_bank.shape)
+        
+        torch.save(feature_bank, os.path.join(ckpt_root_dir, 'train_reps.pt'))
+        print(f"saved train features to {ckpt_root_dir}/train_reps.pt")
 
 def make_sh_and_submit(args):
     os.makedirs('./scripts/', exist_ok=True)
@@ -204,7 +246,7 @@ if __name__ == "__main__":
     parser.add_argument('--bias', action='store_true') # default = False
     parser.add_argument('--vocab_size', default=50304, type=int) # default to GPT-2 vocab size
     parser.add_argument('--online_head', action='store_true') # default = False
-    parser.add_argument('--pos_enc', default ='seq_11times', type=str)    
+    parser.add_argument('--pos_enc', default ='conseq', type=str)    
     parser.add_argument('--no_collide', action='store_true') # default = False
     parser.add_argument('--ignore_proj', action='store_true') # default = False
     
