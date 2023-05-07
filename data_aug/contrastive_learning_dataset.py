@@ -135,6 +135,7 @@ class WFDataset_lab(Dataset):
     def __init__(
         self,
         root: str,
+        use_chan_pos: bool = False, 
         multi_chan: bool = False,
         split: str = 'train',
         transform: Optional[Callable] = None,
@@ -160,6 +161,8 @@ class WFDataset_lab(Dataset):
         print(self.data.shape)
         self.root = root
         self.transform = transform
+        self.channel_locs = np.load(os.path.join(root, self.chan_coords_fn))
+        self.use_chan_pos = use_chan_pos
 
     def __getitem__(self, index: int) -> Any :
         """
@@ -170,12 +173,16 @@ class WFDataset_lab(Dataset):
         """
         wf = self.data[index].astype('float32')
         y = self.targets[index].astype('long')
+        chan_loc = self.channel_locs[index].astype('float32')
 
         # doing this so that it is a tensor
         # wf = torch.from_numpy(wf)
 
         if self.transform is not None:
             wf = self.transform(wf)
+
+        if self.use_chan_pos:
+            return [wf, chan_loc], y
 
         return wf, y
 
