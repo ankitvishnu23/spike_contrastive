@@ -71,7 +71,7 @@ def main_worker(gpu, args):
     
     num_extra_chans = args.num_extra_chans if args.multi_chan else 0
     
-    dataset = ContrastiveLearningDataset(args.data, args.out_dim, multi_chan=args.multi_chan)
+    dataset = ContrastiveLearningDataset(args.data, args.out_dim, multi_chan=args.multi_chan, use_chan_pos=args.use_chan_pos)
 
     train_dataset = dataset.get_dataset(args.dataset_name, args.n_views, args.noise_scale, num_extra_chans)
     print("ddp:", args.ddp)
@@ -107,9 +107,9 @@ def main_worker(gpu, args):
         test_loader = None
            
     if args.use_gpt:
-        model_args = dict(n_layer=args.n_layer, n_head=args.n_head, n_embd=args.n_embd, block_size=args.block_size,
-                  bias=args.bias, vocab_size=args.vocab_size, dropout=args.dropout, out_dim=args.out_dim, is_causal=args.is_causal, 
-                  proj_dim=args.proj_dim, pos=args.pos_enc, multi_chan=args.multi_chan) 
+        model_args = dict(n_layer=args.n_layer, n_head=args.n_head, n_embd=args.n_embd, use_chan_pos=args.use_chan_pos, block_size=args.block_size,
+                  bias=args.bias, vocab_size=args.vocab_size, dropout=args.dropout, out_dim=args.out_dim, is_causal=args.is_causal,
+                  n_extra_chans=num_extra_chans, proj_dim=args.proj_dim, pos=args.pos_enc, multi_chan=args.multi_chan) 
         gptconf = GPTConfig(**model_args)
         model = Single_GPT(gptconf).cuda(gpu)
     else:
@@ -278,6 +278,7 @@ if __name__ == "__main__":
     parser.add_argument('--no_collide', action='store_true') # default = False
     parser.add_argument('--num_extra_chans', default=0, type=int)
     parser.add_argument('--add_train', action='store_true') # default = False
+    parser.add_argument('--use_chan_pos', action='store_true') # default = False
     
     args = parser.parse_args()
     
