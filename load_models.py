@@ -15,6 +15,7 @@ class Encoder(torch.nn.Module):
             self.backbone = Multi_GPT(gptconf)
         else:
             self.backbone = Single_GPT(gptconf)
+            self.backbone.projector = torch.nn.Identity() # this is loaded separately later
         if rep_after_proj:
             self.projector = Projector(rep_dim=gptconf.out_dim, proj_dim=gptconf.proj_dim)
         else:
@@ -33,10 +34,8 @@ def load_ckpt(ckpt_path, multi_chan=False, single_rep_dim=5, pos_enc='conseq', r
         state_dict = {k.replace('module.', ''): v for k, v in ckpt['model'].items()}
         m, e = model.load_state_dict(state_dict, strict=False)
     else:
-        state_dict = {'backbone.'+k: v for k,v in ckpt['state_dict'].items()}
-        print(state_dict.keys())
-        print("model keys", model.state_dict().keys())
-    
+        state_dict = {'backbone.'+k: v for k,v in ckpt['state_dict'].items() if 'projector' not in k}
+        state_dict.update({k: v for k,v in ckpt['state_dict'].items() if 'projector' in k})
         m, e = model.load_state_dict(state_dict, strict=False)
     print("missing keys", m)
     print("unexpected keys", e)
