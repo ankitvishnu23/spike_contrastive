@@ -13,13 +13,15 @@ from data_aug.wf_data_augs import AmpJitter, Jitter, Collide, SmartNoise, ToWfTe
 from typing import Any, Callable, Optional, Tuple
 
 class WFDataset(Dataset):
-    filename = "spikes_train.npy"
-    multi_filename = "multichan_spikes_train.npy"
-    single_chan_mcs = "channel_num_train.npy"
+    train_set_fn = "spikes_train.npy"
+    spike_mcs_fn = "channel_num_train.npy"
+    chan_coords_fn = "channel_spike_locs_train.npy"
+    targets_fn = "labels_train.npy"
 
     def __init__(
         self,
         root: str,
+        use_chan_pos: bool = False, 
         transform: Optional[Callable] = None,
         target_transform: Optional[Callable] = None,
     ) -> None:
@@ -29,14 +31,15 @@ class WFDataset(Dataset):
         self.data: Any = []
 
         # now load the numpy array
-        self.data = np.load(os.path.join(root, self.filename))
+        self.data = np.load(os.path.join(root, self.train_set_fn))
         print(self.data.shape)
         self.root = root
-        self.max_chans = np.load(os.path.join(root, self.single_chan_mcs))
+        self.max_chans = np.load(os.path.join(root, self.spike_mcs_fn))
         self.transform = transform
-        self.targets = np.array([[i for j in range(1200)] \
-                                for i in range(10)]).reshape(-1).astype('long')
+        self.targets = np.load(os.path.join(root, self.targets_fn))
         self.target_transform = target_transform
+        self.channel_locs = np.load(os.path.join(root, self.chan_coords_fn))
+        self.use_chan_pos = use_chan_pos
 
 
     def __getitem__(self, index: int) -> Any :
@@ -49,8 +52,7 @@ class WFDataset(Dataset):
         wf = self.data[index].astype('float32')
         mc = self.max_chans[index]
         y = self.targets[index].astype('long')
-        # doing this so that it is a tensor
-        # wf = torch.from_numpy(wf)
+        chan_loc = self.channel_locs[index].astype('float32')
 
         if self.transform is not None:
             wf = self.transform([wf, mc])
@@ -58,6 +60,9 @@ class WFDataset(Dataset):
         if self.target_transform is not None:
             y = self.target_transform(y)
 
+        if self.use_chan_pos:
+            return [wf, chan_loc], y
+        
         return wf, y
 
 
@@ -66,13 +71,15 @@ class WFDataset(Dataset):
 
 
 class WF_MultiChan_Dataset(Dataset):
-    filename = "spikes_train.npy"
-    multi_chan_mcs_fn = "channel_num_train.npy"
+    train_set_fn = "spikes_train.npy"
+    spike_mcs_fn = "channel_num_train.npy"
     targets_fn = "labels_train.npy"
+    chan_coords_fn = "channel_spike_locs_train.npy"
 
     def __init__(
         self,
         root: str,
+        use_chan_pos: bool = False, 
         transform: Optional[Callable] = None,
         target_transform: Optional[Callable] = None
     ) -> None:
@@ -82,13 +89,15 @@ class WF_MultiChan_Dataset(Dataset):
         self.data: Any = []
 
         # now load the numpy array
-        self.data = np.load(os.path.join(root, self.filename))
+        self.data = np.load(os.path.join(root, self.train_set_fn))
         print(self.data.shape)
         self.root = root
-        self.chan_nums = np.load(os.path.join(root, self.multi_chan_mcs_fn))
+        self.chan_nums = np.load(os.path.join(root, self.spike_mcs_fn))
         self.transform = transform
         self.targets = np.load(os.path.join(root, self.targets_fn))
         self.target_transform = target_transform
+        self.channel_locs = np.load(os.path.join(root, self.chan_coords_fn))
+        self.use_chan_pos = use_chan_pos
 
     def __getitem__(self, index: int) -> Any :
         """
@@ -100,6 +109,7 @@ class WF_MultiChan_Dataset(Dataset):
         wf = self.data[index].astype('float32')
         y = self.targets[index].astype('long')
         chan_nums = self.chan_nums[index]
+        chan_loc = self.channel_locs[index].astype('float32')
 
         # doing this so that it is a tensor
         # wf = torch.from_numpy(wf)
@@ -109,6 +119,9 @@ class WF_MultiChan_Dataset(Dataset):
 
         if self.target_transform is not None:
             y = self.target_transform(y)
+
+        if self.use_chan_pos:
+            return [wf, chan_loc], y
             
         return wf, y
 
@@ -170,10 +183,11 @@ class WFDataset_lab(Dataset):
         return len(self.data)
 
 class ContrastiveLearningDataset:
-    def __init__(self, root_folder, lat_dim, multi_chan):
+    def __init__(self, root_folder, lat_dim, multi_chan, use_chan_pos):
         self.root_folder = root_folder
         self.lat_dim = lat_dim
         self.multi_chan = multi_chan
+        self.use_chan_pos = use_chan_pos
     
 
     @staticmethod
@@ -216,7 +230,7 @@ class ContrastiveLearningDataset:
         spatial_cov_fn = 'spatial_cov_example.npy'
         if self.multi_chan:
             name = name + '_multichan'
-        valid_datasets = {'wfs': lambda: WFDataset(self.root_folder,
+        valid_datasets = {'wfs': lambda: WFDataset(self.root_folder, use_chan_pos=self.use_chan_pos,
                                                               transform=ContrastiveLearningViewGenerator(
                                                                   self.get_wf_pipeline_transform(self, temp_cov_fn,
                                                                   spatial_cov_fn,
@@ -224,7 +238,7 @@ class ContrastiveLearningDataset:
                                                                   noise_scale, 0), None,
                                                                   n_views),
                                                                   target_transform=LabelViewGenerator()),
-                          'wfs_multichan': lambda: WF_MultiChan_Dataset(self.root_folder,
+                          'wfs_multichan': lambda: WF_MultiChan_Dataset(self.root_folder, use_chan_pos=self.use_chan_pos,
                                                               transform=ContrastiveLearningViewGenerator(
                                                                   self.get_wf_pipeline_transform(self, temp_cov_fn,
                                                                   spatial_cov_fn,
