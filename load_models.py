@@ -32,13 +32,27 @@ def load_ckpt(ckpt_path, multi_chan=False, single_rep_dim=5, pos_enc='conseq', r
     model = Encoder(multi_chan=multi_chan, single_rep_dim=single_rep_dim, pos_enc=pos_enc, rep_after_proj=rep_after_proj)
     if multi_chan:
         state_dict = {k.replace('module.', ''): v for k, v in ckpt['model'].items()}
-        m, e = model.load_state_dict(state_dict, strict=False)
+        m, uek = model.load_state_dict(state_dict, strict=False)
+        if rep_after_proj:
+            for k in uek:
+                assert 'online_head' in k, "Error: key matching errors!"
+        else:
+            for k in uek:
+                assert 'projector' in k or 'online' in k, "Error: key matching errors!"
     else:
         state_dict = {'backbone.'+k: v for k,v in ckpt['state_dict'].items() if 'projector' not in k}
         state_dict.update({k: v for k,v in ckpt['state_dict'].items() if 'projector' in k})
-        m, e = model.load_state_dict(state_dict, strict=False)
+        m, uek = model.load_state_dict(state_dict, strict=False)
+        if not rep_after_proj:
+            for k in uek:
+                assert 'projector' in k, "Error: key matching errors!"
+        else:
+            assert(len(uek)==0)
+    assert(len(m)==0)
     print("missing keys", m)
-    print("unexpected keys", e)
+    print("unexpected keys", uek)
+    # assert that unexpected keys should only contain the string 'projector'
+    
     return model
 
 def get_dataloader(data_path, multi_chan=False, split='train'):
