@@ -2,6 +2,7 @@ import torch
 from data_aug.contrastive_learning_dataset import ContrastiveLearningDataset, WFDataset_lab
 from models.model_GPT import GPTConfig, Multi_GPT, Single_GPT, Projector
 from data_aug.wf_data_augs import Crop
+import os
 
 class Encoder(torch.nn.Module):
     def __init__(self, multi_chan = False, single_rep_dim=5, pos_enc='conseq', rep_after_proj=False):
@@ -65,3 +66,30 @@ def get_dataloader(data_path, multi_chan=False, split='train'):
             dataset, batch_size=128, shuffle=False,
             num_workers=16, pin_memory=True, drop_last=False)
     return loader
+
+
+def save_reps(model, loader, ckpt_path, split='train', multi_chan=False,rep_after_proj=False):
+    ckpt_root_dir = '/'.join(ckpt_path.split('/')[:-1])
+    model.eval()
+    feature_bank = []
+    with torch.no_grad():
+        for data, target in loader:
+            if not multi_chan:
+                data = torch.squeeze(data, dim=1)
+                data = torch.unsqueeze(data, dim=-1)
+            else:
+                data = data.view(-1, 11*121)
+                data = torch.unsqueeze(data, dim=-1)
+            
+            feature = model(data.cuda(non_blocking=True))
+            feature_bank.append(feature)
+            
+        feature_bank = torch.cat(feature_bank, dim=0)
+        print(feature_bank.shape)
+        if rep_after_proj:
+            torch.save(feature_bank, os.path.join(ckpt_root_dir, f'{split}_aftproj_reps.pt'))
+            print(f"saved {split} features to {ckpt_root_dir}/{split}_aftproj_reps.pt")
+        else:
+            torch.save(feature_bank, os.path.join(ckpt_root_dir, f'{split}_reps.pt'))
+            print(f"saved {split} features to {ckpt_root_dir}/{split}_reps.pt")
+    
