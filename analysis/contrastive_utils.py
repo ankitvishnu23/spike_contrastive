@@ -12,7 +12,7 @@ def load_GPT_backbone(backbone, checkpoint, is_multi_chan):
     else:
         state_dict = checkpoint["model"]
         sd_keys = state_dict.keys()
-        state_dict_backbone = {k:state_dict[k] for k in sd_keys if (k.startswith('module.backbone.') or k.startswith('module.projector.proj_block.') or k.startswith('module.online_head.')) and not k.endswith('.attn.bias')}
+        state_dict_backbone = {k:state_dict[k] for k in sd_keys if k.startswith('module.backbone.') and not k.endswith('.attn.bias')}
         backbone_keys = state_dict_backbone.keys()
         # print(backbone_keys)
         state_dict_backbone_final = {k.replace('module.', '').replace('backbone.', ''):state_dict_backbone[k] for k in backbone_keys}
