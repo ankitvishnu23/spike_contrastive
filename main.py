@@ -6,7 +6,7 @@ import sys
 import random
 
 import time
-import json
+import jsonsimclr
 import math
 import numpy as np
 
@@ -99,7 +99,7 @@ def main_worker(gpu, args):
         start_epoch = 0
 
     num_extra_chans = args.num_extra_chans if args.multi_chan else 0
-    ds = ContrastiveLearningDataset(args.data, args.out_dim, multi_chan=args.multi_chan)
+    ds = ContrastiveLearningDataset(args.data, args.out_dim, multi_chan=args.multi_chan, use_chan_pos=args.use_chan_pos)
     dataset = ds.get_dataset('wfs', 2, args.noise_scale, num_extra_chans)
     
     if args.ddp:
@@ -146,13 +146,20 @@ def main_worker(gpu, args):
 
         for step, (wf, labels) in enumerate(loader, start=epoch * len(loader)):
             labels = labels[0].long()
-            y1 = wf[0].float()
-            y2 = wf[1].float()
+            if args.use_chan_pos:
+                y1 = wf[0][0].float()
+                y2 = wf[1][0].float()
+                chan_pos = wf[0][1].float()
+            else:
+                y1 = wf[0].float()
+                y2 = wf[1].float()
+                chan_pos = None
+
             if not args.multi_chan:
                 y1, y2 = torch.squeeze(y1, dim=1), torch.squeeze(y2, dim=1)
                 y1, y2 = torch.unsqueeze(y1, dim=-1), torch.unsqueeze(y2, dim=-1)
             else:
-                y1, y2 = y1.view(-1, 11*121), y2.view(-1, 11*121)
+                y1, y2 = y1.view(-1, (args.num_extra_chans*2+1)*121), y2.view(-1, (args.num_extra_chans*2+1)*121)
                 y1, y2 = torch.unsqueeze(y1, dim=-1), torch.unsqueeze(y2, dim=-1)
             y1 = y1.cuda(gpu, non_blocking=True)
             y2 = y2.cuda(gpu, non_blocking=True)
@@ -168,7 +175,7 @@ def main_worker(gpu, args):
                 lr = args.learning_rate
             optimizer.zero_grad(set_to_none=True)
             with torch.cuda.amp.autocast():
-                loss, acc = model.forward(y1, y2, labels)
+                loss, acc = model.forward(y1, y2, labels, chan_pos=chan_pos)
 
             scaler.scale(loss).backward()
             scaler.step(optimizer)
@@ -237,9 +244,11 @@ def adjust_learning_rate(args, optimizer, loader, step):
 class SimCLR(nn.Module):
     def __init__(self, args):
         super().__init__()
+        num_extra_chans = args.num_extra_chans if args.multi_chan else 0
         model_args = dict(n_layer=args.n_layer, n_head=args.n_head, n_embd=args.n_embd, block_size=args.block_size,
                   bias=args.bias, vocab_size=args.vocab_size, dropout=args.dropout, out_dim=args.out_dim, is_causal=args.is_causal, 
-                  proj_dim=args.proj_dim, pos=args.pos_enc, multi_chan=args.multi_chan) 
+                  proj_dim=args.proj_dim, pos=args.pos_enc, multi_chan=args.multi_chan, 
+                  use_chan_pos=args.use_chan_pos, n_extra_chans=num_extra_chans) 
         gptconf = GPTConfig(**model_args)
         self.backbone = Multi_GPT(gptconf)
         self.args = args
@@ -249,13 +258,20 @@ class SimCLR(nn.Module):
         self.online_head = nn.Linear(gptconf.out_dim, 10) # 10 classes
 
 
-    def forward(self, y1, y2=None, labels=None):
+    def forward(self, y1, y2=None, labels=None, chan_pos=None):
         if y2 is None:
-            r1 = self.backbone(y1)
+            if chan_pos is not None:
+                r1 = self.backbone(y1, chan_pos=chan_pos)
+            else:
+                r1 = self.backbone(y1)
             # z1 = self.projector(r1)
             return r1
-        r1 = self.backbone(y1)
-        r2 = self.backbone(y2)
+        if chan_pos is not None:
+            r1 = self.backbone(y1, chan_pos=chan_pos)
+            r2 = self.backbone(y2, chan_pos=chan_pos)
+        else:
+            r1 = self.backbone(y1)
+            r2 = self.backbone(y2)
 
         # projoection
         z1 = self.projector(r1)
@@ -437,7 +453,7 @@ if __name__ == "__main__":
     parser.add_argument('--knn-freq', default=1, type=int, metavar='N',
                         help='save frequency')
     parser.add_argument('--add_train', action='store_true') # default = False
-    
+    parser.add_argument('--use_chan_pos', action='store_true') # default = False
     args = parser.parse_args()
     
     main(args)
