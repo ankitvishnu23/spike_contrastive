@@ -207,7 +207,7 @@ class Collide(object):
 
         return wf_final
 
-    
+
 class Jitter(object):
     """Rescale the image in a sample to a given size.
     Args:

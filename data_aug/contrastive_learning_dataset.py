@@ -247,7 +247,7 @@ class ContrastiveLearningDataset:
         spatial_cov_fn = 'spatial_cov_example.npy'
         if self.multi_chan:
             name = name + '_multichan'
-        valid_datasets = {'wfs': lambda: WFDataset(self.root_folder, use_chan_pos=self.use_chan_pos,
+        valid_datasets = {'wfs': lambda: WFDataset(self.root_folder,
                                                               transform=ContrastiveLearningViewGenerator(
                                                                   self.get_wf_pipeline_transform(self, temp_cov_fn,
                                                                   spatial_cov_fn,
