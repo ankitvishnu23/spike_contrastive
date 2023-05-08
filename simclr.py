@@ -19,6 +19,7 @@ from utils import (
 import tensorboard_logger as tb_logger
 torch.manual_seed(0)
 import time
+from load_models import save_reps
 
 class SimCLR(object):
 
@@ -221,3 +222,4 @@ class SimCLR(object):
             }, is_best=False, filename=os.path.join(self.args.checkpoint_dir, 'final.pth'))
             # }, is_best=False, filename=os.path.join('./runs', checkpoint_name))
             logging.info(f"Model checkpoint and metadata has been saved at {self.args.checkpoint_dir}.")
+        
