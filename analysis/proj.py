@@ -10,9 +10,7 @@ def learn_manifold_umap(data, umap_dim, umap_min_dist=0.2, umap_metric='euclidea
 def pca_train(train, test, n_comps):
     pca_ = PCA(n_components=n_comps, whiten=True)
     pca_.fit(train)
-    print('train done')
     test_comps = pca_.transform(test)
-    print('pca test done')
     return test_comps, pca_.explained_variance_ratio_
 
 def pca(S, n_comps):

@@ -135,11 +135,13 @@ class WFDataset_lab(Dataset):
             self.data = np.load(os.path.join(root, self.filename)).astype('float32')
             self.targets = np.array([[i for j in range(1200)] \
                                 for i in range(10)]).reshape(-1).astype('long')
+            self.chan_nums = np.load(os.path.join(root, "channel_num_train.npy"))
         elif split == 'test':
             self.filename = "spikes_test.npy"
             self.data = np.load(os.path.join(root, self.filename)).astype('float32')
             self.targets = np.array([[i for j in range(300)] \
                                 for i in range(10)]).reshape(-1).astype('long')
+            self.chan_nums = np.load(os.path.join(root, "channel_num_test.npy"))
             
         # self.data: Any = []
 
@@ -157,12 +159,13 @@ class WFDataset_lab(Dataset):
         """
         wf = self.data[index].astype('float32')
         y = self.targets[index].astype('long')
+        chan_nums = self.chan_nums[index]
 
         # doing this so that it is a tensor
         # wf = torch.from_numpy(wf)
 
         if self.transform is not None:
-            wf = self.transform(wf)
+            wf = self.transform([wf, chan_nums])
 
         return wf, y
 
