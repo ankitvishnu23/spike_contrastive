@@ -6,7 +6,7 @@ import sys
 import random
 
 import time
-import jsonsimclr
+import json
 import math
 import numpy as np
 
@@ -148,8 +148,10 @@ def main_worker(gpu, args):
             labels = labels[0].long()
             if args.use_chan_pos:
                 y1 = wf[0][0].float()
-                y2 = wf[1][0].float()
-                chan_pos = wf[0][1].float()
+                y2 = wf[0][1].float()
+                chan_pos = wf[1][0].float()
+                # chan_pos2 = wf[1][1].float()
+                # print(chan_pos2 == chan_pos)
             else:
                 y1 = wf[0].float()
                 y2 = wf[1].float()

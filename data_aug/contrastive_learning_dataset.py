@@ -131,6 +131,7 @@ class WF_MultiChan_Dataset(Dataset):
 
 
 class WFDataset_lab(Dataset):
+    chan_coords_fn = "channel_spike_locs_train.npy"
 
     def __init__(
         self,

@@ -148,8 +148,8 @@ class Collide(object):
         temp_name = self.temp_name
         if root_folder is not None:
             self.root_folder = root_folder
-        if multi_chan:
-            temp_name = 'multichan_' + temp_name
+        # if multi_chan:
+            # temp_name = 'multichan_' + temp_name
         if templates is None:
             templates = np.load(os.path.join(self.root_folder, temp_name))
         # assert isinstance(templates, (array, array))
