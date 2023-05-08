@@ -110,6 +110,10 @@ class SimCLR(object):
             # time4 = time.time()
             for i, (wf, lab) in enumerate(train_loader):
                 # print(f"batch {i}")
+                chan_pos = None
+                if self.args.use_chan_pos:
+                    wf, chan_pos = wf
+                    chan_pos = torch.cat(chan_pos, dim=0).float()
                 wf = torch.cat(wf, dim=0).float()
                 lab = torch.cat(lab, dim=0).long().cuda(self.gpu,non_blocking=True)
                 # wf = torch.squeeze(wf)
@@ -120,7 +124,7 @@ class SimCLR(object):
                         wf = torch.squeeze(wf, dim=1)
                         wf = torch.unsqueeze(wf, dim=-1)
                     else:
-                        wf = wf.view(-1, 11*121)
+                        wf = wf.view(-1, (self.args.num_extra_chans*2+1)*121)
                         wf = torch.unsqueeze(wf, dim=-1)
                 wf = wf.cuda(self.gpu,non_blocking=True)
                 # wf = wf.float().cuda(self.args.device)
@@ -129,9 +133,9 @@ class SimCLR(object):
                 
                 with autocast(enabled=self.args.fp16):
                     if self.args.online_head:
-                        features, cls_loss, online_acc = self.model(wf, lab)
-                    else:  
-                        features = self.model(wf)
+                        features, cls_loss, online_acc = self.model(wf, lab, chan_pos=chan_pos)
+                    else:
+                        features = self.model(wf, chan_pos=chan_pos)
                         cls_loss = 0.
                         online_acc = -1
                     if self.proj is not None:

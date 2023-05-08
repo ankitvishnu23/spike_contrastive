@@ -149,10 +149,13 @@ class GPTConfig:
     n_layer: int = 12
     n_head: int = 12
     n_embd: int = 768
+    n_coords: int = 2
     dropout: float = 0.0
     bias: bool = True # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
     out_dim: int = 5
     proj_dim: int = 5
+    use_chan_pos: bool = False
+    n_extra_chans: int = 5
     is_causal: bool = True
     pos: str = 'seq_11times'
     multi_chan: bool = False
@@ -457,6 +460,9 @@ class Multi_GPT(nn.Module):
             self.lm_head = nn.Linear(config.n_embd, config.out_dim, bias=False)
         else:
             self.lm_head = nn.Linear(config.n_embd * config.block_size, config.out_dim, bias=False)
+
+        self.chan_pos_enc = nn.Linear(config.n_coords, config.n_embd)
+        self.tot_chans = 2*config.n_extra_chans + 1
         
         # self.projector = Projector(rep_dim=config.out_dim, proj_dim=config.proj_dim)
         # self.online_head = nn.Linear(config.out_dim, 10) # 10 classes
@@ -497,16 +503,16 @@ class Multi_GPT(nn.Module):
         elif isinstance(module, nn.Embedding):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
-    def forward(self, idx, labels = None, targets=None):
+    def forward(self, idx, labels = None, targets=None, chan_pos=None):
         device = idx.device
         b, t, nc = idx.size()
         # print("t:", t, "block_size: ", self.config.block_size)
         assert t <= self.config.block_size, f"Cannot forward sequence of length {t}, block size is only {self.config.block_size}"
         if self.config.multi_chan:
             if self.config.pos == 'seq_11times':
-                pos = torch.arange(0, 121, dtype=torch.long, device=device).repeat(11).unsqueeze(0) # shape (1, t)
+                pos = torch.arange(0, 121, dtype=torch.long, device=device).repeat(self.tot_chans).unsqueeze(0) # shape (1, t)
             elif self.config.pos == 'block_11times':
-                pos = torch.cat([torch.Tensor([i]).long().repeat(121) for i in range(11)]).unsqueeze(0).to(device)
+                pos = torch.cat([torch.Tensor([i]).long().repeat(121) for i in range(self.tot_chans)]).unsqueeze(0).to(device)
             else:
                 pos = torch.arange(0, t, dtype=torch.long, device=device).unsqueeze(0) # shape (1, t)
         else:
@@ -514,12 +520,21 @@ class Multi_GPT(nn.Module):
 
         # pos = torch.arange(0, t, dtype=torch.long, device=device).unsqueeze(0) # shape (1, t)
         # print("pos: ", pos.shape)
-        
+
         # forward the GPT model itself
         tok_emb = self.transformer.wte(idx) # token embeddings of shape (b, t, n_embd)
         pos_emb = self.transformer.wpe(pos) # position embeddings of shape (1, t, n_embd)
+
+        if self.config.use_chan_pos:
+            assert chan_pos is not None
+            ext_chan_pos = torch.cat([chan_pos[:, i].repeat(1, 121).reshape(b, 121, -1) for i in range(self.tot_chans)], axis=1)
+            # ext_chan_pos = torch.cat([torch.Tensor(chan_pos[:, i]).repeat(1, 121).reshape(b, 121, -1) for i in range(self.tot_chans)], axis=1)
+            chan_pos_emb = self.chan_pos_enc(ext_chan_pos)
+            x = self.transformer.drop(tok_emb + pos_emb + chan_pos_emb)
+        else:
+            x = self.transformer.drop(tok_emb + pos_emb)
         
-        x = self.transformer.drop(tok_emb + pos_emb)
+        
         for block in self.transformer.h:
             x = block(x)
         x = self.transformer.ln_f(x)

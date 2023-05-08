@@ -269,5 +269,7 @@ python knn_eval.py --checkpoint-dir=/gpfs/u/home/BNSS/BNSSlhch/scratch/spike_ddp
 python knn_eval.py --checkpoint-dir=/gpfs/u/home/BNSS/BNSSlhch/scratch/spike_ddp/saved_models/0501_mc_gpt_conseq_causal_nembd64_block1331_bs128_extra5_lr0.001/checkpoint.pth --multi_chan --is_causal --batch-size=128 --n_embd=64
 python knn_eval.py --checkpoint-dir=/gpfs/u/home/BNSS/BNSSlhch/scratch/spike_ddp/saved_models/0502_mc_gpt_conseq_causal_nembd64_block1331_bs128_extra5_lr0.0001_knn10_addtrain/checkpoint.pth --multi_chan --is_causal --batch-size=128 --n_embd=64
 
+python knn_eval.py --checkpoint-dir=./ddp_models/0502_mc_gpt_conseq_causal_nembd64_block1331_bs128_extra5_lr0.0001_knn10_addtrain/checkpoint.pth --multi_chan --is_causal --batch-size=128 --n_embd=64 --pos_enc=conseq --data=/home/gridsan/cloh/spike_data/multi_dy016_random_neurons_04_28_2023
+
 
 """

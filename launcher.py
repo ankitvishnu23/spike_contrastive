@@ -107,6 +107,7 @@ parser.add_argument('--num_extra_chans', default=0, type=int)
 parser.add_argument('--knn-freq', default=100, type=int, metavar='N',
                         help='save frequency')
 parser.add_argument('--add_train', action='store_true') # default = False
+parser.add_argument('--use_chan_pos', action='store_true') # default = False
 
 class Trainer(object):
     def __init__(self, args):
