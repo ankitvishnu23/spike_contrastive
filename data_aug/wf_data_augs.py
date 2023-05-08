@@ -315,7 +315,7 @@ class Crop(object):
             if type(chan_nums) != np.int64: 
                 chan_nums = chan_nums[max_chan_ind-self.num_extra_chans:max_chan_ind+self.num_extra_chans+1]
         
-        if chan_locs:
+        if chan_locs is not None:
             # verify that channel location is not for a single channel waveform
             if len(chan_locs.shape) > 1 and chan_locs.shape[0] != 1:
                 chan_locs = chan_locs[max_chan_ind-self.num_extra_chans:max_chan_ind+self.num_extra_chans+1]
@@ -324,7 +324,7 @@ class Crop(object):
         if len(wf.shape) == 1:
             wf = np.expand_dims(wf, axis=0)
         if self.ignore_chan_num:
-            if chan_locs:
+            if chan_locs is not None:
                 return wf, chan_locs
             return wf
         

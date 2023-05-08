@@ -527,7 +527,8 @@ class Multi_GPT(nn.Module):
 
         if self.config.use_chan_pos:
             assert chan_pos is not None
-            ext_chan_pos = torch.cat([torch.Tensor(chan_pos[:, i]).repeat(1, 121).reshape(b, 121, -1) for i in range(self.tot_chans)], axis=1)
+            ext_chan_pos = torch.cat([chan_pos[:, i].repeat(1, 121).reshape(b, 121, -1) for i in range(self.tot_chans)], axis=1)
+            # ext_chan_pos = torch.cat([torch.Tensor(chan_pos[:, i]).repeat(1, 121).reshape(b, 121, -1) for i in range(self.tot_chans)], axis=1)
             chan_pos_emb = self.chan_pos_enc(ext_chan_pos)
             x = self.transformer.drop(tok_emb + pos_emb + chan_pos_emb)
         else:

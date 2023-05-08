@@ -148,15 +148,16 @@ def main_worker(gpu, args):
             labels = labels[0].long()
             if args.use_chan_pos:
                 y1 = wf[0][0].float()
-                y2 = wf[0][1].float()
-                chan_pos = wf[1][0].float()
-                # chan_pos2 = wf[1][1].float()
-                # print(chan_pos2 == chan_pos)
+                y2 = wf[1][0].float()
+                chan_pos = wf[0][1].float()
+                chan_pos2 = wf[1][1].float()
+     
             else:
                 y1 = wf[0].float()
                 y2 = wf[1].float()
                 chan_pos = None
-
+                chan_pos2 = None
+                
             if not args.multi_chan:
                 y1, y2 = torch.squeeze(y1, dim=1), torch.squeeze(y2, dim=1)
                 y1, y2 = torch.unsqueeze(y1, dim=-1), torch.unsqueeze(y2, dim=-1)
@@ -165,11 +166,10 @@ def main_worker(gpu, args):
                 y1, y2 = torch.unsqueeze(y1, dim=-1), torch.unsqueeze(y2, dim=-1)
             y1 = y1.cuda(gpu, non_blocking=True)
             y2 = y2.cuda(gpu, non_blocking=True)
-            # if args.mask_mode == 'topk' or args.mask_mode == 'topk_sum' or args.mask_mode == 'topk_agg_sum' or args.mask_mode == 'weight_anchor_logits' or args.mask_mode == 'weight_class_logits':
-            #     topk_labels = labels[1].cuda(gpu, non_blocking=True)
-            #     labels = labels[0].cuda(gpu, non_blocking=True)
-            # else:
-            # topk_labels = None
+            if args.use_chan_pos:
+                chan_pos = chan_pos.cuda(gpu, non_blocking=True)
+                chan_pos2 = chan_pos2.cuda(gpu, non_blocking=True)
+
             labels = labels.cuda(gpu, non_blocking=True)
             if args.optimizer != 'adam':
                 lr = adjust_learning_rate(args, optimizer, loader, step)
@@ -177,7 +177,7 @@ def main_worker(gpu, args):
                 lr = args.learning_rate
             optimizer.zero_grad(set_to_none=True)
             with torch.cuda.amp.autocast():
-                loss, acc = model.forward(y1, y2, labels, chan_pos=chan_pos)
+                loss, acc = model.forward(y1, y2, labels, chan_pos=chan_pos, chan_pos2=chan_pos2)
 
             scaler.scale(loss).backward()
             scaler.step(optimizer)
@@ -260,7 +260,7 @@ class SimCLR(nn.Module):
         self.online_head = nn.Linear(gptconf.out_dim, 10) # 10 classes
 
 
-    def forward(self, y1, y2=None, labels=None, chan_pos=None):
+    def forward(self, y1, y2=None, labels=None, chan_pos=None, chan_pos2=None):
         if y2 is None:
             if chan_pos is not None:
                 r1 = self.backbone(y1, chan_pos=chan_pos)
@@ -270,7 +270,7 @@ class SimCLR(nn.Module):
             return r1
         if chan_pos is not None:
             r1 = self.backbone(y1, chan_pos=chan_pos)
-            r2 = self.backbone(y2, chan_pos=chan_pos)
+            r2 = self.backbone(y2, chan_pos=chan_pos2)
         else:
             r1 = self.backbone(y1)
             r2 = self.backbone(y2)
