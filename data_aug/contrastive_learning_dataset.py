@@ -172,6 +172,7 @@ class WFDataset_lab(Dataset):
         self.transform = transform
         self.channel_locs = np.load(os.path.join(root, self.chan_coords_fn))
         self.use_chan_pos = use_chan_pos
+        self.chan_nums = np.load(os.path.join(root, self.spike_mcs_fn))
 
     def __getitem__(self, index: int) -> Any :
         """
