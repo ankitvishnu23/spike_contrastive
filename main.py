@@ -117,11 +117,11 @@ def main_worker(gpu, args):
     
     if args.rank == 0:
         if args.multi_chan:
-            memory_dataset = WFDataset_lab(args.data, split='train', multi_chan=args.multi_chan, transform=Crop(prob=0.0, num_extra_chans=5, ignore_chan_num=True))
+            memory_dataset = WFDataset_lab(args.data, split='train', multi_chan=args.multi_chan, transform=Crop(prob=0.0, num_extra_chans=num_extra_chans, ignore_chan_num=True), use_chan_pos=args.use_chan_pos)
             memory_loader = torch.utils.data.DataLoader(
                 memory_dataset, batch_size=128, shuffle=False,
                 num_workers=args.workers, pin_memory=True, drop_last=False)
-            test_dataset = WFDataset_lab(args.data, split='test', multi_chan=args.multi_chan, transform=Crop(prob=0.0, num_extra_chans=5, ignore_chan_num=True))
+            test_dataset = WFDataset_lab(args.data, split='test', multi_chan=args.multi_chan, transform=Crop(prob=0.0, num_extra_chans=num_extra_chans, ignore_chan_num=True), use_chan_pos=args.use_chan_pos)
             test_loader = torch.utils.data.DataLoader(
                 test_dataset, batch_size=args.batch_size, shuffle=False,
                 num_workers=args.workers, pin_memory=True, drop_last=False)

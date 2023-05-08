@@ -39,6 +39,8 @@ class AmpJitter(object):
     def __call__(self, sample):
         if len(sample) == 2:
             wf, chan_nums = sample
+        elif len(sample) == 3:
+            wf, chan_nums, chan_locs = sample
         else:
             wf = sample
 
@@ -51,7 +53,7 @@ class AmpJitter(object):
 
         wf = wf * amp_jit[:, None]
     
-        return [wf, chan_nums]
+        return [wf, chan_nums, chan_locs]
 
 class GaussianNoise(object):
     """Rescale the image in a sample to a given size.
@@ -63,6 +65,8 @@ class GaussianNoise(object):
     def __call__(self, sample):
         if len(sample) == 2:
             wf, chan_nums = sample
+        elif len(sample) == 3:
+            wf, chan_nums, chan_locs = sample
         else:
             wf = sample
         
@@ -103,6 +107,8 @@ class SmartNoise(object):
     def __call__(self, sample):
         if len(sample) == 2:
             wf, chan_nums = sample
+        elif len(sample) == 3:
+            wf, chan_nums, chan_locs = sample
         else:
             wf = sample
         
@@ -131,7 +137,7 @@ class SmartNoise(object):
         noise_wfs = self.noise_scale * the_noise[:, chan_nums].T
         wf = wf + noise_wfs
 
-        return [wf, chan_nums]
+        return [wf, chan_nums, chan_locs]
 
 
 class Collide(object):
@@ -158,6 +164,8 @@ class Collide(object):
     def __call__(self, sample):
         if len(sample) == 2:
             wf, chan_nums = sample
+        elif len(sample) == 3:
+            wf, chan_nums, chan_locs = sample
         else:
             wf = sample
         
@@ -178,7 +186,7 @@ class Collide(object):
 
         wf = np.add(wf, temp_sel)
 
-        return [wf, chan_nums]
+        return [wf, chan_nums, chan_locs]
     
     def shift_chans(self, wf, shift_):
         # use template feat_channel shifts to interpolate shift of all spikes on all other chans
@@ -219,6 +227,8 @@ class Jitter(object):
     def __call__(self, sample):
         if len(sample) == 2:
             wf, chan_nums = sample
+        elif len(sample) == 3:
+            wf, chan_nums, chan_locs = sample
         else:
             wf = sample
 
@@ -253,7 +263,7 @@ class Jitter(object):
         wf = up_shifted_temp[np.arange(n_chans), idxs]
         wf = self.shift_chans(wf, shift)
 
-        return [wf, chan_nums]
+        return [wf, chan_nums, chan_locs]
 
     def shift_chans(self, wf, shift_):
         # use template feat_channel shifts to interpolate shift of all spikes on all other chans
@@ -282,10 +292,11 @@ class Crop(object):
         self.ignore_chan_num = ignore_chan_num
         
     def __call__(self, sample):
-        if len(sample) == 2:
-            wf, chan_nums = sample
+        if len(sample) == 3:
+            wf, chan_nums, chan_locs = sample
         else:
-            wf = sample
+            wf, chan_nums = sample
+            chan_locs = None
         
         if len(wf.shape) == 1:
             wf = np.expand_dims(wf, axis=0)
@@ -303,13 +314,21 @@ class Crop(object):
         if not self.ignore_chan_num:
             if type(chan_nums) != np.int64: 
                 chan_nums = chan_nums[max_chan_ind-self.num_extra_chans:max_chan_ind+self.num_extra_chans+1]
+        
+        if chan_locs:
+            # verify that channel location is not for a single channel waveform
+            if len(chan_locs.shape) > 1 and chan_locs.shape[0] != 1:
+                chan_locs = chan_locs[max_chan_ind-self.num_extra_chans:max_chan_ind+self.num_extra_chans+1]
+
         # in single channel case the wf will become 1 dimensional
         if len(wf.shape) == 1:
             wf = np.expand_dims(wf, axis=0)
         if self.ignore_chan_num:
+            if chan_locs:
+                return wf, chan_locs
             return wf
         
-        return [wf, chan_nums]
+        return [wf, chan_nums, chan_locs]
 
 
 class PCA_Reproj(object):
@@ -357,10 +376,15 @@ class ToWfTensor(object):
     def __call__(self, sample):
         if len(sample) == 2:
             wf, chan_nums = sample
+        elif len(sample) == 3:
+            wf, chan_nums, chan_locs = sample
         else:
             wf = sample
             
         if len(wf.shape) == 1:
             wf = np.expand_dims(wf, axis=0)
+        
+        if len(sample) == 3:
+            return torch.from_numpy(wf.astype('float16')), chan_locs
         
         return torch.from_numpy(wf.astype('float16'))

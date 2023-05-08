@@ -54,7 +54,9 @@ class WFDataset(Dataset):
         y = self.targets[index].astype('long')
         chan_loc = self.channel_locs[index].astype('float32')
 
-        if self.transform is not None:
+        if self.transform is not None and self.use_chan_pos:
+            wf, chan_loc = self.transform([wf, mc, chan_loc])
+        elif self.transform is not None:
             wf = self.transform([wf, mc])
         
         if self.target_transform is not None:
@@ -114,7 +116,9 @@ class WF_MultiChan_Dataset(Dataset):
         # doing this so that it is a tensor
         # wf = torch.from_numpy(wf)
 
-        if self.transform is not None:
+        if self.transform is not None and self.use_chan_pos:
+            wf, chan_loc = self.transform([wf, chan_nums, chan_loc])
+        elif self.transform is not None:
             wf = self.transform([wf, chan_nums])
 
         if self.target_transform is not None:
@@ -131,6 +135,11 @@ class WF_MultiChan_Dataset(Dataset):
 
 
 class WFDataset_lab(Dataset):
+    train_set_fn = "spikes_train.npy"
+    spike_mcs_fn = "channel_num_train.npy"
+    train_targets_fn = "labels_train.npy"
+    test_targets_fn = "labels_test.npy"
+    chan_coords_fn = "channel_spike_locs_train.npy"
 
     def __init__(
         self,
@@ -147,13 +156,11 @@ class WFDataset_lab(Dataset):
             self.filename = "spikes_train.npy"
             print(multi_chan, self.filename)
             self.data = np.load(os.path.join(root, self.filename)).astype('float32')
-            self.targets = np.array([[i for j in range(1200)] \
-                                for i in range(10)]).reshape(-1).astype('long')
+            self.targets = np.load(os.path.join(root, self.train_targets_fn))
         elif split == 'test':
             self.filename = "spikes_test.npy"
             self.data = np.load(os.path.join(root, self.filename)).astype('float32')
-            self.targets = np.array([[i for j in range(300)] \
-                                for i in range(10)]).reshape(-1).astype('long')
+            self.targets = np.load(os.path.join(root, self.test_targets_fn))
             
         # self.data: Any = []
 
@@ -173,13 +180,16 @@ class WFDataset_lab(Dataset):
         """
         wf = self.data[index].astype('float32')
         y = self.targets[index].astype('long')
+        chan_nums = self.chan_nums[index]
         chan_loc = self.channel_locs[index].astype('float32')
 
         # doing this so that it is a tensor
         # wf = torch.from_numpy(wf)
 
-        if self.transform is not None:
-            wf = self.transform(wf)
+        if self.transform is not None and self.use_chan_pos:
+            wf, chan_loc = self.transform([wf, chan_nums, chan_loc])
+        elif self.transform is not None:
+            wf = self.transform([wf, chan_nums])
 
         if self.use_chan_pos:
             return [wf, chan_loc], y
