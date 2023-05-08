@@ -3,6 +3,17 @@ import matplotlib.pyplot as plt
 import numpy as np
 from data_aug.wf_data_augs import AmpJitter, Jitter, Collide, Crop, SmartNoise, ElectrodeDropout
 from matplotlib.patches import Ellipse
+from scipy.spatial.distance import cdist
+import matplotlib.gridspec as gridspec
+import matplotlib.patheffects as pe
+
+import colorcet as cc
+def get_ccolor(k):
+    if k == -1:
+        return "#808080"
+    else:
+        return ccolors[k % len(ccolors)]
+ccolors = cc.glasbey[:31]
 
 # %matplotlib inline
 plt.rc("figure", dpi=100)
@@ -16,6 +27,67 @@ plt.rc('xtick', labelsize=SMALL_SIZE)
 plt.rc('ytick', labelsize=SMALL_SIZE)
 plt.rc('legend', fontsize=SMALL_SIZE)
 plt.rc('figure', titlesize=BIGGER_SIZE)
+
+
+def plot_closest_spikes(X_plot, X_dist, wfs_plot, labels, labels_plot, plot_feature='cont pc', num_spikes=5, sub_figsize=(12,6), annotate_offset = .05, close_to=1, alpha=.05):
+    indices = np.where(np.in1d(labels, labels_plot))[0]
+    X = X_plot
+
+    a = X_dist[np.where(labels == labels_plot[0])]
+    b = X_dist[np.where(labels == labels_plot[1])]
+
+    pcs_a = X_plot[np.where(labels == labels_plot[0])]
+    pcs_b = X_plot[np.where(labels == labels_plot[1])]
+    
+    distance_b = cdist(a, np.mean(b,0)[None,:], 'euclidean')
+    distance_a = cdist(a, np.mean(a,0)[None,:], 'euclidean')
+    
+    if close_to == 1:
+        min_indices = np.argsort(np.min(distance_b, axis=1))[:num_spikes]
+        min_dist = np.sort(np.min(distance_b, axis=1))[:5]
+    else:
+        min_indices = np.argsort(np.min(distance_a, axis=1))[:num_spikes]
+        min_dist = np.sort(np.min(distance_a, axis=1))[:num_spikes]
+
+    for i, min_idx in enumerate(min_indices):
+        fig = plt.figure(figsize=sub_figsize)
+        gs = gridspec.GridSpec(2, 2, height_ratios=[1, 1], width_ratios=[4, 2])
+
+        ax1 = plt.subplot(gs[:2, 0])
+        ax1.scatter(X[indices, 0], X[indices, 1], c=[ccolors[i] for i in labels[indices]], s=40, zorder=2, alpha=alpha)
+        for label_plot in np.unique(labels[indices]):
+            mean_location = np.mean(X[np.where(labels == label_plot)], 0)
+            ax1.scatter(mean_location[0], mean_location[1], color='black', alpha=1, s=40, zorder=2)
+            ax1.annotate(f'{label_plot}', (mean_location[0] + annotate_offset, mean_location[1] + annotate_offset))
+        ax1.scatter(pcs_a[min_idx, 0], pcs_a[min_idx, 1], edgecolors='black', c=ccolors[labels_plot[0]], s=40, zorder=3, alpha=1)
+
+        ax1.set_xlabel(plot_feature + '1')
+        ax1.set_ylabel(plot_feature + '2')
+        dist_a = cdist(a[min_idx][None,:], np.mean(a,0)[None,:], 'euclidean')[0]
+        dist_b = cdist(a[min_idx][None,:], np.mean(b,0)[None,:], 'euclidean')[0]
+        if close_to == 1:
+            ax1.set_title(f'dist mean({labels_plot[1]}): {np.round(min_dist[i],2)} | dist mean({labels_plot[0]}): {np.round(dist_a[0],2)}')
+        else:
+            ax1.set_title(f'dist mean({labels_plot[1]}): {np.round(dist_b[0],2)} | dist mean({labels_plot[0]}): {np.round(min_dist[i],2)}')
+
+        # Second plot
+        ax2 = plt.subplot(gs[0, 1])
+        ax3 = plt.subplot(gs[1, 1])
+
+        spikes_a = wfs_plot[labels == labels_plot[0]]
+        spikes_b = wfs_plot[labels == labels_plot[1]]
+
+        ax2.plot(np.mean(spikes_a, 0).flatten(), color=ccolors[labels_plot[0]])
+        ax3.plot(np.mean(spikes_b, 0).flatten(), color=ccolors[labels_plot[1]])
+        ax2.plot(spikes_a[min_idx].flatten(), color='k', lw=2, path_effects=[pe.Stroke(linewidth=5, alpha=.25, foreground=ccolors[labels_plot[0]]), pe.Normal()], alpha=.25)
+        ax3.plot(spikes_a[min_idx].flatten(), color='k', lw=2, path_effects=[pe.Stroke(linewidth=5, alpha=.25, foreground=ccolors[labels_plot[0]]), pe.Normal()], alpha=.25)
+
+        ax2.set_title(f'template {labels_plot[0]}')
+        ax3.set_title(f'template {labels_plot[1]}')
+
+        plt.show()
+
+
 
 def plot_all_pts(og_reps, title, save_name=None):
     dim = og_reps.shape[1]
