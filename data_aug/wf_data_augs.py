@@ -154,13 +154,8 @@ class Collide(object):
         temp_name = self.temp_name
         if root_folder is not None:
             self.root_folder = root_folder
-<<<<<<< HEAD
-        if multi_chan:
-            temp_name = temp_name
-=======
         # if multi_chan:
             # temp_name = 'multichan_' + temp_name
->>>>>>> ffce1a630a311c1fc0edc5d0b776f917c1c770ba
         if templates is None:
             templates = np.load(os.path.join(self.root_folder, temp_name))
         # assert isinstance(templates, (array, array))
@@ -300,14 +295,9 @@ class Crop(object):
         if len(sample) == 3:
             wf, chan_nums, chan_locs = sample
         else:
-<<<<<<< HEAD
-            wf = sample
-                    
-=======
             wf, chan_nums = sample
             chan_locs = None
         
->>>>>>> ffce1a630a311c1fc0edc5d0b776f917c1c770ba
         if len(wf.shape) == 1:
             wf = np.expand_dims(wf, axis=0)
         n_chans = wf.shape[0]
