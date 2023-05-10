@@ -253,20 +253,17 @@ class Jitter(object):
             x=wf,
             num=w*self.up_factor,
             axis=1)
+
+        # Torch version
+        # resample = Resample(self.sample_rate, self.up_factor * self.sample_rate)
+        # up_temp = torch.zeros((n_chans, w*self.up_factor))
+        # torch_wf = torch.from_numpy(wf)
+        # for chan in n_chans:
+        #     up_temp[chan] = resample(torch_wf[chan]).t()
+        # up_temp = up_temp.numpy()
             
         idx = (np.arange(0, w)[:,None]*self.up_factor + np.arange(self.up_factor))
         up_shifted_temp = np.transpose(up_temp[:, idx], (0, 2, 1))
-
-        # temp_idx = np.random.choice(0, len(self.templates))
-        # temp_sel = self.templates[temp_idx]
-
-        # idx = np.arange(0, self.up_factor*w).reshape(-1, self.up_factor)
-        # up_shifted_wfs = wf_upsamp[idx]
-        # up_shifted_temps.unsqueeze(1)
-        # up_shifted_temps = torch.cat(
-        #     (up_shifted_temps,temp_sel),
-        #     axis=1)
-        
 
         shift = (2* np.random.binomial(1, 0.5)-1) * np.random.uniform(0, self.shift)
         
