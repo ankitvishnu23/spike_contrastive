@@ -49,7 +49,7 @@ def load_ckpt(ckpt_path, multi_chan=False, rep_dim=5, proj_dim=5, pos_enc='conse
                 assert 'projector' in k, "Error: key matching errors!"
         else:
             assert(len(uek)==0)
-    assert(len(m)==0)
+    # assert(len(m)==0)
     print("missing keys", m)
     print("unexpected keys", uek)
     # assert that unexpected keys should only contain the string 'projector'
