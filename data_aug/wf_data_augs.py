@@ -134,15 +134,10 @@ class SmartNoise(object):
             chan_nums[chan_nums < 0] = 0
         noise_wfs = self.noise_scale * the_noise[:, chan_nums].T
         wf = wf + noise_wfs
-
-<<<<<<< Updated upstream
         if chan_locs is None:
             return [wf, chan_nums]
 
         return [wf, chan_nums, chan_locs]
-=======
-        return [wf, chan_nums]
->>>>>>> Stashed changes
 
 
 class Collide(object):
@@ -187,15 +182,11 @@ class Collide(object):
         temp_sel = self.shift_chans(temp_sel, shift)
 
         wf = np.add(wf, temp_sel)
-
-<<<<<<< Updated upstream
         if chan_locs is None:
             return [wf, chan_nums]
 
         return [wf, chan_nums, chan_locs]
-=======
-        return [wf, chan_nums]
->>>>>>> Stashed changes
+
     
     def shift_chans(self, wf, shift_):
         # use template feat_channel shifts to interpolate shift of all spikes on all other chans
