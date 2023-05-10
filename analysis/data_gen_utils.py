@@ -292,7 +292,7 @@ def save_sim_covs(rec_path, save_path):
 #     np.save(os.path.join(save_path, '/temporal_cov.npy'), temporal_cov)
     
 
-def extract_real_IBL(bin_fp, meta_fp, pid, t_window, use_labels=True, sampling_frequency=30_000):
+def extract_IBL(bin_fp, meta_fp, pid, t_window, use_labels=True, sampling_frequency=30_000):
     one = ONE()
     ba = AllenAtlas()
 
