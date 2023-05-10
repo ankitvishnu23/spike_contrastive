@@ -461,7 +461,8 @@ class Multi_GPT(nn.Module):
         else:
             self.lm_head = nn.Linear(config.n_embd * config.block_size, config.out_dim, bias=False)
 
-        self.chan_pos_enc = nn.Linear(config.n_coords, config.n_embd)
+        if self.config.use_chan_pos:
+            self.chan_pos_enc = nn.Linear(config.n_coords, config.n_embd)
         self.tot_chans = 2*config.n_extra_chans + 1
         
         # self.projector = Projector(rep_dim=config.out_dim, proj_dim=config.proj_dim)
