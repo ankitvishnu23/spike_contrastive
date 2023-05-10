@@ -139,9 +139,9 @@ def main_worker(gpu, args):
     scaler = torch.cuda.amp.GradScaler()
     
     # test knn first
-    if args.rank == 0:
-        knn_score = knn_monitor(net=model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True, args=args)
-        print(f"my knn_acc:{knn_score}")  
+    # if args.rank == 0:
+        # knn_score = knn_monitor(net=model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True, args=args)
+        # print(f"my knn_acc:{knn_score}")  
     for epoch in range(start_epoch, args.epochs):
                 
         if args.add_train:

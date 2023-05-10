@@ -19,7 +19,7 @@ from sklearn.decomposition import PCA
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import GridSearchCV
 
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import yaml
 import torch.nn.functional as F
 

@@ -5,8 +5,7 @@ import math
 import pandas as pd
 import numpy as np
 import scipy as sp
-import matplotlib.pyplot as plt
-from skimage import io, transform
+# from skimage import io, transform
 from sklearn.decomposition import PCA
 
 import torch
@@ -17,12 +16,11 @@ from torch.distributions.uniform import Uniform
 from torch.distributions.multivariate_normal import MultivariateNormal
 from torch.distributions.bernoulli import Bernoulli
 # from torchaudio.transforms import Resample
+from scipy import signal
 
 # Ignore warnings
 import warnings
 warnings.filterwarnings("ignore")
-
-plt.ion()   # interactive mode
 
 
 class AmpJitter(object):
@@ -37,6 +35,7 @@ class AmpJitter(object):
         self.hi = hi
 
     def __call__(self, sample):
+        chan_locs = None
         if len(sample) == 2:
             wf, chan_nums = sample
         elif len(sample) == 3:
@@ -52,6 +51,9 @@ class AmpJitter(object):
         amp_jit = np.array([amp_jit_value for i in range(n_chans)])
 
         wf = wf * amp_jit[:, None]
+
+        if chan_locs is None:
+            return [wf, chan_nums]
     
         return [wf, chan_nums, chan_locs]
 
@@ -63,6 +65,7 @@ class GaussianNoise(object):
             to output_size keeping aspect ratio the same.
     """
     def __call__(self, sample):
+        chan_locs = None
         if len(sample) == 2:
             wf, chan_nums = sample
         elif len(sample) == 3:
@@ -105,6 +108,7 @@ class SmartNoise(object):
         
 
     def __call__(self, sample):
+        chan_locs = None
         if len(sample) == 2:
             wf, chan_nums = sample
         elif len(sample) == 3:
@@ -137,6 +141,9 @@ class SmartNoise(object):
         noise_wfs = self.noise_scale * the_noise[:, chan_nums].T
         wf = wf + noise_wfs
 
+        if chan_locs is None:
+            return [wf, chan_nums]
+
         return [wf, chan_nums, chan_locs]
 
 
@@ -162,6 +169,7 @@ class Collide(object):
         self.templates = templates
 
     def __call__(self, sample):
+        chan_locs = None
         if len(sample) == 2:
             wf, chan_nums = sample
         elif len(sample) == 3:
@@ -185,6 +193,9 @@ class Collide(object):
         temp_sel = self.shift_chans(temp_sel, shift)
 
         wf = np.add(wf, temp_sel)
+
+        if chan_locs is None:
+            return [wf, chan_nums]
 
         return [wf, chan_nums, chan_locs]
     
@@ -225,6 +236,7 @@ class Jitter(object):
         self.shift = shift
 
     def __call__(self, sample):
+        chan_locs = None
         if len(sample) == 2:
             wf, chan_nums = sample
         elif len(sample) == 3:
@@ -237,24 +249,21 @@ class Jitter(object):
         n_chans = wf.shape[0]
         w = wf.shape[1]
         
-        up_temp = sp.signal.resample(
+        up_temp = signal.resample(
             x=wf,
             num=w*self.up_factor,
             axis=1)
+
+        # Torch version
+        # resample = Resample(self.sample_rate, self.up_factor * self.sample_rate)
+        # up_temp = torch.zeros((n_chans, w*self.up_factor))
+        # torch_wf = torch.from_numpy(wf)
+        # for chan in n_chans:
+        #     up_temp[chan] = resample(torch_wf[chan]).t()
+        # up_temp = up_temp.numpy()
             
         idx = (np.arange(0, w)[:,None]*self.up_factor + np.arange(self.up_factor))
         up_shifted_temp = np.transpose(up_temp[:, idx], (0, 2, 1))
-
-        # temp_idx = np.random.choice(0, len(self.templates))
-        # temp_sel = self.templates[temp_idx]
-
-        # idx = np.arange(0, self.up_factor*w).reshape(-1, self.up_factor)
-        # up_shifted_wfs = wf_upsamp[idx]
-        # up_shifted_temps.unsqueeze(1)
-        # up_shifted_temps = torch.cat(
-        #     (up_shifted_temps,temp_sel),
-        #     axis=1)
-        
 
         shift = (2* np.random.binomial(1, 0.5)-1) * np.random.uniform(0, self.shift)
         
@@ -262,6 +271,9 @@ class Jitter(object):
         idxs = np.array([idx_selection for i in range(n_chans)])
         wf = up_shifted_temp[np.arange(n_chans), idxs]
         wf = self.shift_chans(wf, shift)
+
+        if chan_locs is None:
+            return [wf, chan_nums]
 
         return [wf, chan_nums, chan_locs]
 
@@ -328,6 +340,9 @@ class Crop(object):
                 return wf, chan_locs
             return wf
         
+        if chan_locs is None:
+            return [wf, chan_nums]
+        
         return [wf, chan_nums, chan_locs]
 
 
@@ -388,3 +403,8 @@ class ToWfTensor(object):
             return torch.from_numpy(wf.astype('float16')), chan_locs
         
         return torch.from_numpy(wf.astype('float16'))
+    
+
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+    plt.ion()   # interactive mode
