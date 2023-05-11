@@ -70,6 +70,7 @@ def main_worker(gpu, args):
     torch.backends.cudnn.benchmark = True
 
     model = SimCLR(args).cuda(gpu)
+
     if args.ddp:
         model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[gpu])
@@ -144,8 +145,7 @@ def main_worker(gpu, args):
         # print(f"my knn_acc:{knn_score}")  
     for epoch in range(start_epoch, args.epochs):
                 
-        if args.add_train:
-            model.train()
+        model.train()
         if args.ddp:
             sampler.set_epoch(epoch)
 
@@ -157,7 +157,6 @@ def main_worker(gpu, args):
                 y2 = wf[1][0].float()
                 chan_pos = wf[0][1].float()
                 chan_pos2 = wf[1][1].float()
-                print("y1: ", y1.shape)
      
             else:
                 y1 = wf[0].float()
@@ -258,7 +257,8 @@ class SimCLR(nn.Module):
                   bias=args.bias, vocab_size=args.vocab_size, dropout=args.dropout, out_dim=args.out_dim, is_causal=args.is_causal, 
                   proj_dim=args.proj_dim, pos=args.pos_enc, multi_chan=args.multi_chan, 
                   use_chan_pos=args.use_chan_pos, n_extra_chans=num_extra_chans,
-                  add_layernorm=args.add_layernorm, use_merge_layer=args.use_merge_layer
+                  add_layernorm=args.add_layernorm, use_merge_layer=args.use_merge_layer,
+                  half_embed_each=args.half_embed_each
                   ) 
         gptconf = GPTConfig(**model_args)
         self.backbone = Multi_GPT(gptconf)
@@ -468,6 +468,7 @@ if __name__ == "__main__":
     parser.add_argument('--use_merge_layer', action='store_true') # default = False
     parser.add_argument('--add_layernorm', action='store_true') # default = False
 
+    parser.add_argument('--half_embed_each', action='store_true') # default = False
     args = parser.parse_args()
     
     main(args)

@@ -2,7 +2,7 @@
 
 script=$1
 shift
-for lr in 0.0001
+for lr in 0.0005
 do
 python wsc_launcher.py --dist-url "tcp://$MASTER_HOSTNAME:10596" --dist-backend 'nccl' --multiprocessing-distributed \
                 --world-size $NODES --rank ${PMIX_RANK} --data /gpfs/wscgpfs02/shivsr/cloh/spike_data/multi_dy016_random_neurons_04_28_2023 --workers 32 \

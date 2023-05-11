@@ -142,6 +142,7 @@ parser.add_argument('--add_train', action='store_true') # default = False
 parser.add_argument('--use_chan_pos', action='store_true') # default = False
 parser.add_argument('--use_merge_layer', action='store_true') # default = False
 parser.add_argument('--add_layernorm', action='store_true') # default = False
+parser.add_argument('--half_embed_each', action='store_true') # default = False
 
 # wsc setting
 parser.add_argument('--world-size', default=-1, type=int,
@@ -160,6 +161,7 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
                          'fastest way to use PyTorch for either single node or '
                          'multi node data parallel training')
 parser.add_argument('--dummy', action='store_true', help="use fake data to benchmark")
+
 
 
 

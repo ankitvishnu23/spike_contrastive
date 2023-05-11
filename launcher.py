@@ -110,6 +110,7 @@ parser.add_argument('--add_train', action='store_true') # default = False
 parser.add_argument('--use_chan_pos', action='store_true') # default = False
 parser.add_argument('--use_merge_layer', action='store_true') # default = False
 parser.add_argument('--add_layernorm', action='store_true') # default = False
+parser.add_argument('--half_embed_each', action='store_true') # default = False
 
 class Trainer(object):
     def __init__(self, args):
