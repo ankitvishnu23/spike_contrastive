@@ -151,11 +151,13 @@ def main_worker(gpu, args):
 
         for step, (wf, labels) in enumerate(loader, start=epoch * len(loader)):
             labels = labels[0].long()
+            
             if args.use_chan_pos:
                 y1 = wf[0][0].float()
                 y2 = wf[1][0].float()
                 chan_pos = wf[0][1].float()
                 chan_pos2 = wf[1][1].float()
+                print("y1: ", y1.shape)
      
             else:
                 y1 = wf[0].float()
@@ -255,7 +257,9 @@ class SimCLR(nn.Module):
         model_args = dict(n_layer=args.n_layer, n_head=args.n_head, n_embd=args.n_embd, block_size=args.block_size,
                   bias=args.bias, vocab_size=args.vocab_size, dropout=args.dropout, out_dim=args.out_dim, is_causal=args.is_causal, 
                   proj_dim=args.proj_dim, pos=args.pos_enc, multi_chan=args.multi_chan, 
-                  use_chan_pos=args.use_chan_pos, n_extra_chans=num_extra_chans) 
+                  use_chan_pos=args.use_chan_pos, n_extra_chans=num_extra_chans,
+                  add_layernorm=args.add_layernorm, use_merge_layer=args.use_merge_layer
+                  ) 
         gptconf = GPTConfig(**model_args)
         self.backbone = Multi_GPT(gptconf)
         self.args = args
@@ -461,6 +465,9 @@ if __name__ == "__main__":
                         help='save frequency')
     parser.add_argument('--add_train', action='store_true') # default = False
     parser.add_argument('--use_chan_pos', action='store_true') # default = False
+    parser.add_argument('--use_merge_layer', action='store_true') # default = False
+    parser.add_argument('--add_layernorm', action='store_true') # default = False
+
     args = parser.parse_args()
     
     main(args)

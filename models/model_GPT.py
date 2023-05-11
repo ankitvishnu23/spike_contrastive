@@ -159,6 +159,8 @@ class GPTConfig:
     is_causal: bool = True
     pos: str = 'seq_11times'
     multi_chan: bool = False
+    use_merge_layer: bool = False
+    add_layernorm: bool = False
 
 class Single_GPT(nn.Module):
 
@@ -462,7 +464,14 @@ class Multi_GPT(nn.Module):
             self.lm_head = nn.Linear(config.n_embd * config.block_size, config.out_dim, bias=False)
 
         if self.config.use_chan_pos:
-            self.chan_pos_enc = nn.Linear(config.n_coords, config.n_embd)
+            if self.config.add_layernorm:
+                self.chan_pos_enc = nn.Sequential(nn.Linear(config.n_coords, config.n_embd), LayerNorm(config.n_embd, bias=config.bias))
+            else:
+                self.chan_pos_enc = nn.Linear(config.n_coords, config.n_embd)
+
+        if self.config.use_merge_layer:
+            self.merge_layer = nn.Linear(config.n_embd * 2, config.n_embd, bias=False)
+      
         self.tot_chans = 2*config.n_extra_chans + 1
         
         # self.projector = Projector(rep_dim=config.out_dim, proj_dim=config.proj_dim)
@@ -527,11 +536,15 @@ class Multi_GPT(nn.Module):
         pos_emb = self.transformer.wpe(pos) # position embeddings of shape (1, t, n_embd)
 
         if self.config.use_chan_pos:
-            assert chan_pos is not None
-            ext_chan_pos = torch.cat([chan_pos[:, i].repeat(1, 121).reshape(b, 121, -1) for i in range(self.tot_chans)], axis=1)
+            assert chan_pos is not None # chan_pos is B x num_channels x 2            
+            ext_chan_pos = torch.cat([chan_pos[:, i].repeat(1, 121).reshape(b, 121, -1) for i in range(self.tot_chans)], axis=1) # B x num_channels*121 x 2
             # ext_chan_pos = torch.cat([torch.Tensor(chan_pos[:, i]).repeat(1, 121).reshape(b, 121, -1) for i in range(self.tot_chans)], axis=1)
-            chan_pos_emb = self.chan_pos_enc(ext_chan_pos)
-            x = self.transformer.drop(tok_emb + pos_emb + chan_pos_emb)
+            chan_pos_emb = self.chan_pos_enc(ext_chan_pos) # B x num_channels*121 x n_embd
+            if self.config.use_merge_layer:
+                tok_emb = self.merge_layer(torch.cat([chan_pos_emb, tok_emb], axis=-1))
+                x = self.transformer.drop(tok_emb + pos_emb)
+            else:
+                x = self.transformer.drop(tok_emb + pos_emb + chan_pos_emb)
         else:
             x = self.transformer.drop(tok_emb + pos_emb)
         

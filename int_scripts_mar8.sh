@@ -278,7 +278,7 @@ python \
       --data /gpfs/wscgpfs02/shivsr/cloh/spike_data/multi_dy016_random_neurons_04_28_2023 \
       --workers 32 \
       --epochs 100 \
-      --batch-size 8 \
+      --batch-size 4 \
       --out_dim 5 \
       --proj_dim 5 \
       --optimizer adam \
@@ -287,13 +287,13 @@ python \
       --log-dir /gpfs/wscgpfs02/shivsr/cloh/spike_contrastive/logs/ \
       --ngpus-per-node 4 \
       --nodes 4 \
-      --exp test_wsc \
+      --exp test_wsc2 \
       --block_size 1331 \
       --n_embd 64 \
       --multi_chan \
       --pos_enc conseq \
       --is_causal \
-      --num_extra_chans 5 \
+      --num_extra_chans 2 \
       --knn-freq 10 \
       --add_train \
       --use_chan_pos

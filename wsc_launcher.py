@@ -140,8 +140,10 @@ parser.add_argument('--knn-freq', default=100, type=int, metavar='N',
                         help='save frequency')
 parser.add_argument('--add_train', action='store_true') # default = False
 parser.add_argument('--use_chan_pos', action='store_true') # default = False
-# wsc setting
+parser.add_argument('--use_merge_layer', action='store_true') # default = False
+parser.add_argument('--add_layernorm', action='store_true') # default = False
 
+# wsc setting
 parser.add_argument('--world-size', default=-1, type=int,
                     help='number of nodes for distributed training')
 parser.add_argument('--rank', default=-1, type=int,
