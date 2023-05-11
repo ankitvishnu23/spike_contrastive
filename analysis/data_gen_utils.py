@@ -1,7 +1,32 @@
+import spikeinterface.full as si
+import MEArec as mr
+import numpy as np
+import matplotlib.pyplot as plt
+import colorcet as cc
+import math
+import os
+import h5py
 import random
 import logging
 import numpy as np
 from scipy.spatial.distance import pdist, squareform
+from matplotlib.gridspec import GridSpec
+
+try:
+    from brainbox.io.one import SpikeSortingLoader
+    from ibllib.atlas import AllenAtlas
+    from one.api import ONE
+    import brainbox.io.one as bbone
+except ImportError:
+    print("Failed to import IBL packages (brainbox, ibllib, one, brainbox")
+    
+import datetime
+from spike_psvae.subtract import read_geom_from_meta
+from pathlib import Path
+from spike_psvae.waveform_utils import make_channel_index, make_contiguous_channel_index
+from spike_psvae import denoise, snr_templates, spike_train_utils
+import torch
+from spike_psvae.spikeio import read_waveforms
 
 def kill_signal(recordings, threshold, window_size):
     """
@@ -212,7 +237,7 @@ def search_noise_snippets(recordings, is_noise_idx, sample_size,
 
     return noise_wf
 
-def split_data(data, num_train, num_val, num_test, n_chans):
+def split_data(data, num_train, num_val, num_test, n_chans, last_dim):
     train_set = []
     val_set = []
     test_set = []
@@ -220,16 +245,16 @@ def split_data(data, num_train, num_val, num_test, n_chans):
     n_div = int(len(data) / tot_num)
     for i in range(n_div):
         train_set.append(data[num_train*i:num_train*(i+1)])
-        val_set.append(unit[num_train*(i+1):num_train*(i+1)+num_val])
-        test_set.append(unit[num_train*(i+1)+num_val:num_train*(i+1)+num_val+num_test])
+        val_set.append(data[num_train*(i+1):num_train*(i+1)+num_val])
+        test_set.append(data[num_train*(i+1)+num_val:num_train*(i+1)+num_val+num_test])
 
-    train_set = np.array(train_set).reshape(-1, n_chans, 2)
-    val_set = np.array(val_set).reshape(-1, n_chans, 2)
-    test_set = np.array(test_set).reshape(-1, n_chans, 2)
+    train_set = np.array(train_set).reshape(-1, n_chans, last_dim)
+    val_set = np.array(val_set).reshape(-1, n_chans, last_dim)
+    test_set = np.array(test_set).reshape(-1, n_chans, last_dim)
     
     return train_set, val_set, test_set
 
-def pad_channels(wf, geoms, mc_start, mc_end, n_chans):
+def pad_channels(wf, geoms, mc_start, mc_end, n_chans, spike_length_samples=121):
     curr_n_chans = mc_end - mc_start
     pad_beg = n_chans - curr_n_chans if mc_start == 0 else 0
     pad_end = n_chans - curr_n_chans if mc_start > 0 else 0
@@ -240,10 +265,10 @@ def pad_channels(wf, geoms, mc_start, mc_end, n_chans):
         print(mc_end)
         print(pad_beg)
         print(pad_end)
-        print('bad wf')
+        raise ValueError("bad wf")
     
-    pad_beg_wf = np.zeros((pad_beg, 121))
-    pad_end_wf = np.zeros((pad_end, 121))
+    pad_beg_wf = np.zeros((pad_beg, spike_length_samples))
+    pad_end_wf = np.zeros((pad_end, spike_length_samples))
     wf = np.concatenate([pad_beg_wf, wf, pad_end_wf])
     
     pad_beg_cn = -1 * np.ones((pad_beg,))
@@ -270,7 +295,7 @@ def save_sim_covs(rec_path, save_path):
     
     norm_chan_recording = rec.get_traces()
     
-    spatial_cov, temporal_cov = noise_whitener(norm_chan_recording, 121, 50)
+    spatial_cov, temporal_cov = noise_whitener(norm_chan_recording, spike_length_samples, 50)
     
     np.save(os.path.join(save_path, '/spatial_cov.npy'), spatial_cov)
     np.save(os.path.join(save_path, '/temporal_cov.npy'), temporal_cov)
@@ -286,7 +311,7 @@ def save_sim_covs(rec_path, save_path):
     
 #     norm_chan_recording = rec.get_traces()
     
-#     spatial_cov, temporal_cov = noise_whitener(norm_chan_recording, 121, 50)
+#     spatial_cov, temporal_cov = noise_whitener(norm_chan_recording, spike_length_samples, 50)
     
 #     np.save(os.path.join(save_path, '/spatial_cov.npy'), spatial_cov)
 #     np.save(os.path.join(save_path, '/temporal_cov.npy'), temporal_cov)
@@ -329,11 +354,11 @@ def extract_IBL(bin_fp, meta_fp, pid, t_window, use_labels=True, sampling_freque
     return spike_index, geom, channel_index, templates
     
     
-def extract_sim(rec_path, wfs_per_unit, use_labels=True):
+def extract_sim(rec_path, wfs_per_unit, use_labels=True, geom_dims=(1,2), trough_offset=42, spike_length_samples=121):
     recgen = mr.load_recordings(rec_path, load_waveforms=False)
     # recgen.extract_templates(cut_out=[1.9,1.91], recompute=True)
     geom_original = recgen.channel_positions[()]
-    depth_order = np.argsort(geom_original[:,2])
+    depth_order = np.argsort(geom_original[:,geom_dims[1]])
     geom = geom_original[depth_order]
     sort = si.MEArecSortingExtractor(rec_path)
     
@@ -342,8 +367,8 @@ def extract_sim(rec_path, wfs_per_unit, use_labels=True):
     rec = si.common_reference(rec, reference='global', operator='median')
     rec = si.zscore(rec)
     
-    pre_peak = 42
-    post_peak = 79
+    pre_peak = trough_offset
+    post_peak = spike_length_samples - pre_peak
 
     folder = 'waveform_folder'
     we = si.extract_waveforms(
@@ -366,8 +391,9 @@ def extract_sim(rec_path, wfs_per_unit, use_labels=True):
     return spike_index.T, geom, we
 
 
-def make_dataset(bin_path, spike_index, geom, save_folder, we=None, templates=None, chan_index=None,
-                 num_chans_extract=21, unit_ids=None, train_num=1200, val_num=100, test_num=200, plot=False):
+def make_dataset(bin_path, spike_index, geom, save_path, geom_dims=(1,2), we=None, templates=None,
+                 num_chans_extract=21, unit_ids=None, train_num=1200, val_num=100, test_num=200, 
+                 trough_offset=42, spike_length_samples=121, plot=False):
     num_waveforms = train_num + val_num + test_num
     spikes_array = []
     geom_locs_array = []
@@ -376,7 +402,7 @@ def make_dataset(bin_path, spike_index, geom, save_folder, we=None, templates=No
     num_chans = math.floor(num_chans_extract/2)
     tot_num_chans = geom.shape[0]
     if we is not None:
-        depth_order = np.argsort(geom[:,2])
+        depth_order = np.argsort(geom[:,geom_dims[1]])
         geom = geom[depth_order]
     num_waveforms = train_num + val_num + test_num
 
@@ -388,27 +414,31 @@ def make_dataset(bin_path, spike_index, geom, save_folder, we=None, templates=No
     plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
     if plot:
-        fig = plt.figure(figsize=(12 + int(num_chans_extract*0.5), 24))
-        gs = GridSpec(len(unit_ids), num_chans_extract+1, figure=fig)
-        x = np.arange(121)
+        if unit_ids is not None:
+            fig = plt.figure(figsize=(12 + int(num_chans_extract*0.5), 24))
+            gs = GridSpec(len(unit_ids), num_chans_extract+1, figure=fig)
+            x = np.arange(spike_length_samples)
+        else:
+            print("no unit ids, skipping plotting...")
     
     if unit_ids is None:
-        waveforms, _ = read_waveforms(spike_index[:, 0], bin_file, 
-                                      n_channels=geom.shape[0], spike_length_samples=121)
+        print("reading waveforms")
+        waveforms, _ = read_waveforms(spike_index[:, 0], bin_path, 
+                                      n_channels=geom.shape[0], spike_length_samples=spike_length_samples)
         mcs = spike_index[:, 1]
+        print("cropping and storing waveforms")
         for i, waveform in enumerate(waveforms):
             mc_curr = mcs[i]
             mc_start = max(mc_curr - num_chans, 0)
-            mc_end = min(mc_curr + num_chans, tot_num_chans) + 1
+            mc_end = min(mc_curr + num_chans, tot_num_chans - 1) + 1
             crop_wf, crop_chan, crop_geom, mask = pad_channels(waveform.T[mc_start:mc_end], 
-                                                               geom[mc_start:mc_end, 1:], mc_start, mc_end, 
+                                                               geom[mc_start:mc_end, geom_dims], mc_start, mc_end, 
                                                                num_chans_extract)
             spikes_array.append(crop_wf)
             geom_locs_array.append(crop_geom)
         max_chan_array = mcs
-        
     else:
-        for k, unit_id in enumerate(unit_ids):
+        for k, unit_id in tqdm(enumerate(unit_ids), desc="Unit IDs"):
             curr_temp_wfs = []
             curr_geom_locs = []
             curr_spike_max_chan = []
@@ -422,8 +452,8 @@ def make_dataset(bin_path, spike_index, geom, save_folder, we=None, templates=No
             else:
                 spike_frames_template = np.random.choice(spike_index[:,0][np.where(spike_index[:,2] == i)[0]], 
                                                          size=num_waveforms)
-                waveforms, _ = read_waveforms(spike_frames_template, bin_file, channel_index=channel_index,
-                                              n_channels=geom.shape[0], spike_length_samples=121)
+                waveforms, _ = read_waveforms(spike_frames_template, bin_path, channel_index=channel_index,
+                                              n_channels=geom.shape[0], spike_length_samples=spike_length_samples)
             mc = np.unique(spike_index[:, 2][np.where(spike_index[:,1] == unit_id)[0]])[0]
             mcs_template = templates[unit_id].ptp(0).argsort()[::-1][:num_template_amps_shift]
             shifts = np.abs(waveforms[:,:,mcs_template]).max(1).argmax(1)
@@ -433,15 +463,14 @@ def make_dataset(bin_path, spike_index, geom, save_folder, we=None, templates=No
                 mc_start = max(mc_curr - num_chans, 0)
                 mc_end = min(mc_curr + num_chans + 1, tot_num_chans)
                 crop_wf, crop_chan, crop_geom, mask = pad_channels(waveform.T[mc_start:mc_end],
-                                                                   geom[mc_start:mc_end, 1:], mc_start, mc_end, 
-                                                                   num_chans_extract)
+                                                                   geom[mc_start:mc_end, geom_dims], mc_start, 
+                                                                   mc_end, num_chans_extract)
                 curr_temp_wfs.append(crop_wf)
                 curr_geom_locs.append(crop_geom)
                 curr_spike_max_chan.append(crop_chan)
 
             curr_temp_wfs = np.asarray(curr_temp_wfs)
             curr_geom_locs = np.asarray(curr_geom_locs)
-            print(curr_temp_wfs.shape)
 
             spikes_array.append(curr_temp_wfs)
             geom_locs_array.append(curr_geom_locs)
@@ -464,16 +493,15 @@ def make_dataset(bin_path, spike_index, geom, save_folder, we=None, templates=No
     spikes_array = np.array(spikes_array)
     geom_locs_array = np.array(geom_locs_array)
     max_chan_array = np.array(max_chan_array)
-    print(spikes_array.shape)
-    print(geom_locs_array.shape)
-    print(max_chan_array.shape)
     np.save(os.path.join(save_path, 'full_raw_spikes.npy'), spikes_array)
     np.save(os.path.join(save_path, 'channel_spike_locs.npy'), geom_locs_array)
-            
-    train_set, val_set, test_set = split_data(spikes_array, train_num, val_num, test_num, num_chans_extract)
-    train_geom_locs, val_geom_locs, test_geom_locs = split_data(geom_locs_array, train_num, val_num, test_num, num_chans_extract)
-    train_max_chan, val_max_chan, test_max_chan = split_data(max_chan_array, train_num, val_num, test_num, num_chans_extract)
-            
+    
+    print("making train, val, test splits")
+    train_set, val_set, test_set = split_data(spikes_array, train_num, val_num, test_num, num_chans_extract, last_dim=spike_length_samples)
+    train_geom_locs, val_geom_locs, test_geom_locs = split_data(geom_locs_array, train_num, val_num, test_num, num_chans_extract, last_dim=geom.shape[1])
+    train_max_chan, val_max_chan, test_max_chan = split_data(max_chan_array, train_num, val_num, test_num, 1, last_dim=1)
+    
+    print("saving final results")
     np.save(os.path.join(save_path, 'spikes_train.npy'), train_set)
     np.save(os.path.join(save_path, 'spikes_val.npy'), val_set)
     np.save(os.path.join(save_path, 'spikes_test.npy'), test_set)
@@ -482,10 +510,12 @@ def make_dataset(bin_path, spike_index, geom, save_folder, we=None, templates=No
     np.save(os.path.join(save_path, 'channel_spike_locs_val.npy'), val_geom_locs)
     np.save(os.path.join(save_path, 'channel_spike_locs_test.npy'), test_geom_locs)
     
-    np.save(os.path.join(save_path, 'channel_num_train.npy'), train_max_chan)
-    np.save(os.path.join(save_path, 'channel_num_val.npy'), val_max_chan)
-    np.save(os.path.join(save_path, 'channel_num_test.npy'), test_max_chan)
+    np.save(os.path.join(save_path, 'channel_num_train.npy'), train_max_chan[0])
+    np.save(os.path.join(save_path, 'channel_num_val.npy'), val_max_chan[0])
+    np.save(os.path.join(save_path, 'channel_num_test.npy'), test_max_chan[0])
     
     np.save(os.path.join(save_path, 'geom.npy'), geom)
+    
+    return train_set, val_set, test_set, train_geom_locs, val_geom_locs, test_geom_locs, train_max_chan, val_max_chan, test_max_chan
     
     
