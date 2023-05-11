@@ -138,6 +138,8 @@ class SmartNoise(object):
         if type(chan_nums) != np.int64: 
             chan_nums[chan_nums > n_chans_total-1] = n_chans_total - 1
             chan_nums[chan_nums < 0] = 0
+            
+        chan_nums = chan_nums.astype(int) # sometimes chan_nums is a float
         noise_wfs = self.noise_scale * the_noise[:, chan_nums].T
         wf = wf + noise_wfs
 
