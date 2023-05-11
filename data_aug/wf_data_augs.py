@@ -38,6 +38,8 @@ class AmpJitter(object):
         chan_locs = None
         if len(sample) == 2:
             wf, chan_nums = sample
+        elif len(sample) == 3:
+            wf, chan_nums, chan_locs = sample
         else:
             wf = sample
 
@@ -53,7 +55,7 @@ class AmpJitter(object):
         if chan_locs is None:
             return [wf, chan_nums]
     
-        return [wf, chan_nums]
+        return [wf, chan_nums, chan_locs]
 
 class GaussianNoise(object):
     """Rescale the image in a sample to a given size.
@@ -66,6 +68,8 @@ class GaussianNoise(object):
         chan_locs = None
         if len(sample) == 2:
             wf, chan_nums = sample
+        elif len(sample) == 3:
+            wf, chan_nums, chan_locs = sample
         else:
             wf = sample
         
@@ -107,6 +111,8 @@ class SmartNoise(object):
         chan_locs = None
         if len(sample) == 2:
             wf, chan_nums = sample
+        elif len(sample) == 3:
+            wf, chan_nums, chan_locs = sample
         else:
             wf = sample
         
@@ -134,6 +140,7 @@ class SmartNoise(object):
             chan_nums[chan_nums < 0] = 0
         noise_wfs = self.noise_scale * the_noise[:, chan_nums].T
         wf = wf + noise_wfs
+
         if chan_locs is None:
             return [wf, chan_nums]
 
@@ -154,6 +161,8 @@ class Collide(object):
         temp_name = self.temp_name
         if root_folder is not None:
             self.root_folder = root_folder
+        # if multi_chan:
+            # temp_name = 'multichan_' + temp_name
         if templates is None:
             templates = np.load(os.path.join(self.root_folder, temp_name))
         # assert isinstance(templates, (array, array))
@@ -163,6 +172,8 @@ class Collide(object):
         chan_locs = None
         if len(sample) == 2:
             wf, chan_nums = sample
+        elif len(sample) == 3:
+            wf, chan_nums, chan_locs = sample
         else:
             wf = sample
         
@@ -182,11 +193,11 @@ class Collide(object):
         temp_sel = self.shift_chans(temp_sel, shift)
 
         wf = np.add(wf, temp_sel)
+
         if chan_locs is None:
             return [wf, chan_nums]
 
         return [wf, chan_nums, chan_locs]
-
     
     def shift_chans(self, wf, shift_):
         # use template feat_channel shifts to interpolate shift of all spikes on all other chans
@@ -207,7 +218,7 @@ class Collide(object):
 
         return wf_final
 
-    
+
 class Jitter(object):
     """Rescale the image in a sample to a given size.
     Args:
@@ -228,6 +239,8 @@ class Jitter(object):
         chan_locs = None
         if len(sample) == 2:
             wf, chan_nums = sample
+        elif len(sample) == 3:
+            wf, chan_nums, chan_locs = sample
         else:
             wf = sample
 
@@ -333,7 +346,6 @@ class Crop(object):
         return [wf, chan_nums, chan_locs]
 
 
-
 class PCA_Reproj(object):
     """Rescale the image in a sample to a given size.
     Args:
@@ -379,6 +391,8 @@ class ToWfTensor(object):
     def __call__(self, sample):
         if len(sample) == 2:
             wf, chan_nums = sample
+        elif len(sample) == 3:
+            wf, chan_nums, chan_locs = sample
         else:
             wf = sample
             
