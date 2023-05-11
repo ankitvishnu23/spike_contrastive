@@ -316,6 +316,8 @@ class Crop(object):
         # in single channel case the wf will become 1 dimensional
         if len(wf.shape) == 1:
             wf = np.expand_dims(wf, axis=0)
+            
+        # if crop is being used on it's own as an aug (for knn)   
         if self.ignore_chan_num:
             return wf
         

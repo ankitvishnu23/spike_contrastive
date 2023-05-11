@@ -144,7 +144,7 @@ def knn_monitor(net, memory_data_loader, test_data_loader, device='cuda', k=200,
             else:
                 if args.use_chan_pos:
                     data, chan_pos = data
-                data = data.view(-1, 11*121)
+                data = data.view(-1, (2*args.num_extra_chans+1)*121)
                 data = torch.unsqueeze(data, dim=-1)
             
             if args.use_chan_pos:
@@ -169,10 +169,9 @@ def knn_monitor(net, memory_data_loader, test_data_loader, device='cuda', k=200,
             else:
                 if args.use_chan_pos:
                     data, chan_pos = data
-                else:
-                    chan_pos = None
-                data = data.view(-1, 11*121)
+                data = data.view(-1, (2*args.num_extra_chans+1)*121)
                 data = torch.unsqueeze(data, dim=-1)
+                
             if args.use_chan_pos:
                 feature = net(data.to(device=device, non_blocking=True), chan_pos=chan_pos.to(device=device, non_blocking=True))
             else:

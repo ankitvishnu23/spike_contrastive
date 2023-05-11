@@ -136,10 +136,14 @@ class WF_MultiChan_Dataset(Dataset):
 
 class WFDataset_lab(Dataset):
     train_set_fn = "spikes_train.npy"
-    spike_mcs_fn = "channel_num_train.npy"
     train_targets_fn = "labels_train.npy"
+    spike_mcs_train_fn = "channel_num_train.npy"
+    chan_coords_train_fn = "channel_spike_locs_train.npy"
+
+    test_set_fn = "spikes_test.npy"
     test_targets_fn = "labels_test.npy"
-    chan_coords_fn = "channel_spike_locs_train.npy"
+    spike_mcs_test_fn = "channel_num_test.npy"
+    chan_coords_test_fn = "channel_spike_locs_test.npy"
 
     def __init__(
         self,
@@ -153,16 +157,16 @@ class WFDataset_lab(Dataset):
 
         super().__init__()
         if split == 'train':
-            self.filename = "spikes_train.npy"
-            print(multi_chan, self.filename)
-            self.data = np.load(os.path.join(root, self.filename)).astype('float32')
+            print(multi_chan, self.train_set_fn)
+            self.data = np.load(os.path.join(root, self.train_set_fn)).astype('float32')
             self.targets = np.load(os.path.join(root, self.train_targets_fn))
-            self.chan_nums = np.load(os.path.join(root, "channel_num_train.npy"))
+            self.chan_nums = np.load(os.path.join(root, self.spike_mcs_train_fn))
+            self.channel_locs = np.load(os.path.join(root, self.chan_coords_train_fn))
         elif split == 'test':
-            self.filename = "spikes_test.npy"
-            self.data = np.load(os.path.join(root, self.filename)).astype('float32')
+            self.data = np.load(os.path.join(root, self.test_set_fn)).astype('float32')
             self.targets = np.load(os.path.join(root, self.test_targets_fn))
-            self.chan_nums = np.load(os.path.join(root, "channel_num_test.npy"))
+            self.chan_nums = np.load(os.path.join(root, self.spike_mcs_test_fn))
+            self.channel_locs = np.load(os.path.join(root, self.chan_coords_test_fn))
             
         # self.data: Any = []
 
@@ -170,9 +174,7 @@ class WFDataset_lab(Dataset):
         print(self.data.shape)
         self.root = root
         self.transform = transform
-        self.channel_locs = np.load(os.path.join(root, self.chan_coords_fn))
         self.use_chan_pos = use_chan_pos
-        self.chan_nums = np.load(os.path.join(root, self.spike_mcs_fn))
 
     def __getitem__(self, index: int) -> Any :
         """
