@@ -173,6 +173,7 @@ def knn_monitor(net, memory_data_loader, test_data_loader, device='cuda', k=200,
                     chan_pos = None
                 data = data.view(-1, int(args.num_extra_chans*2+1)*121)
                 data = torch.unsqueeze(data, dim=-1)
+                
             if args.use_chan_pos:
                 feature = net(data.to(device=device, non_blocking=True), chan_pos=chan_pos.to(device=device, non_blocking=True))
             else:

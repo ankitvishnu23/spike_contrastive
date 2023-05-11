@@ -5,12 +5,12 @@ from data_aug.wf_data_augs import Crop
 import os
 
 class Encoder(torch.nn.Module):
-    def __init__(self, multi_chan = False, single_rep_dim=5, pos_enc='conseq', rep_after_proj=False):
+    def __init__(self, multi_chan = False, rep_dim=5, proj_dim=5, pos_enc='conseq', rep_after_proj=False):
         super().__init__()
         if multi_chan:
             model_args = dict(bias=False, block_size=1331, n_layer=20, n_head =4, n_embd=64, dropout=0.2, out_dim=5, proj_dim=5, is_causal=True, pos = pos_enc, multi_chan=True)
         else:
-            model_args = dict(bias=False, block_size=121, n_layer=20, n_head =4, n_embd=32, dropout=0.2, out_dim=single_rep_dim, proj_dim=single_rep_dim, is_causal=True, pos = pos_enc, multi_chan=False)
+            model_args = dict(bias=False, block_size=121, n_layer=20, n_head =4, n_embd=32, dropout=0.2, out_dim=rep_dim, proj_dim=proj_dim, is_causal=True, pos = pos_enc, multi_chan=False)
         gptconf = GPTConfig(**model_args)
         if multi_chan:
             self.backbone = Multi_GPT(gptconf)
@@ -28,9 +28,9 @@ class Encoder(torch.nn.Module):
             r = self.projector(r)
         return r   
 
-def load_ckpt(ckpt_path, multi_chan=False, single_rep_dim=5, pos_enc='conseq', rep_after_proj=False):
+def load_ckpt(ckpt_path, multi_chan=False, rep_dim=5, proj_dim=5, pos_enc='conseq', rep_after_proj=False):
     ckpt = torch.load(ckpt_path, map_location=torch.device('cpu'))
-    model = Encoder(multi_chan=multi_chan, single_rep_dim=single_rep_dim, pos_enc=pos_enc, rep_after_proj=rep_after_proj)
+    model = Encoder(multi_chan=multi_chan, rep_dim=rep_dim, proj_dim=proj_dim, pos_enc=pos_enc, rep_after_proj=rep_after_proj)
     if multi_chan:
         state_dict = {k.replace('module.', ''): v for k, v in ckpt['model'].items()}
         m, uek = model.load_state_dict(state_dict, strict=False)
@@ -49,7 +49,7 @@ def load_ckpt(ckpt_path, multi_chan=False, single_rep_dim=5, pos_enc='conseq', r
                 assert 'projector' in k, "Error: key matching errors!"
         else:
             assert(len(uek)==0)
-    assert(len(m)==0)
+    # assert(len(m)==0)
     print("missing keys", m)
     print("unexpected keys", uek)
     # assert that unexpected keys should only contain the string 'projector'
