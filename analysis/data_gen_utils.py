@@ -11,6 +11,7 @@ import logging
 import numpy as np
 from scipy.spatial.distance import pdist, squareform
 from matplotlib.gridspec import GridSpec
+from tqdm import tqdm
 
 try:
     from brainbox.io.one import SpikeSortingLoader
@@ -244,14 +245,20 @@ def split_data(data, num_train, num_val, num_test, n_chans, last_dim):
     tot_num = num_train + num_val + num_test
     n_div = int(len(data) / tot_num)
     for i in range(n_div):
-        train_set.append(data[num_train*i:num_train*(i+1)])
-        val_set.append(data[num_train*(i+1):num_train*(i+1)+num_val])
-        test_set.append(data[num_train*(i+1)+num_val:num_train*(i+1)+num_val+num_test])
+        start = (num_train+num_val+num_test)*i
+        train_set.append(data[start:start+num_train])
+        val_set.append(data[start+num_train:start+num_train+num_val])
+        test_set.append(data[start+num_train+num_val:start+num_train+num_val+num_test])
 
-    train_set = np.array(train_set).reshape(-1, n_chans, last_dim)
-    val_set = np.array(val_set).reshape(-1, n_chans, last_dim)
-    test_set = np.array(test_set).reshape(-1, n_chans, last_dim)
-    
+    if last_dim > 0:
+        train_set = np.array(train_set).reshape(-1, n_chans, last_dim)
+        val_set = np.array(val_set).reshape(-1, n_chans, last_dim)
+        test_set = np.array(test_set).reshape(-1, n_chans, last_dim)
+    else:
+        train_set = np.array(train_set).reshape(-1, n_chans)
+        val_set = np.array(val_set).reshape(-1, n_chans)
+        test_set = np.array(test_set).reshape(-1, n_chans)
+        
     return train_set, val_set, test_set
 
 def pad_channels(wf, geoms, mc_start, mc_end, n_chans, spike_length_samples=121):
@@ -260,12 +267,12 @@ def pad_channels(wf, geoms, mc_start, mc_end, n_chans, spike_length_samples=121)
     pad_end = n_chans - curr_n_chans if mc_start > 0 else 0
     
     wf_len = wf.shape[0]
-    if pad_beg + wf_len + pad_end != n_chans:
-        print(mc_start)
-        print(mc_end)
-        print(pad_beg)
-        print(pad_end)
-        raise ValueError("bad wf")
+    # if pad_beg + wf_len + pad_end != n_chans:
+    #     print(mc_start)
+    #     print(mc_end)
+    #     print(pad_beg)
+    #     print(pad_end)
+    #     raise ValueError("bad wf")
     
     pad_beg_wf = np.zeros((pad_beg, spike_length_samples))
     pad_end_wf = np.zeros((pad_end, spike_length_samples))
@@ -285,7 +292,7 @@ def pad_channels(wf, geoms, mc_start, mc_end, n_chans, spike_length_samples=121)
     
     return wf, chan_nums, geoms, mask
 
-def save_sim_covs(rec_path, save_path):
+def save_sim_covs(rec_path, save_path, spike_length_samples=121):
     recgen = mr.load_recordings(rec_path, load_waveforms=False)
     
     rec = si.MEArecRecordingExtractor(rec_path)
@@ -297,8 +304,8 @@ def save_sim_covs(rec_path, save_path):
     
     spatial_cov, temporal_cov = noise_whitener(norm_chan_recording, spike_length_samples, 50)
     
-    np.save(os.path.join(save_path, '/spatial_cov.npy'), spatial_cov)
-    np.save(os.path.join(save_path, '/temporal_cov.npy'), temporal_cov)
+    np.save(os.path.join(save_path, 'spatial_cov_example.npy'), spatial_cov)
+    np.save(os.path.join(save_path, 'temporal_cov_example.npy'), temporal_cov)
     
     
 # def save_real_covs(rec_path, save_path):
@@ -392,7 +399,7 @@ def extract_sim(rec_path, wfs_per_unit, use_labels=True, geom_dims=(1,2), trough
 
 
 def make_dataset(bin_path, spike_index, geom, save_path, geom_dims=(1,2), we=None, templates=None,
-                 num_chans_extract=21, unit_ids=None, train_num=1200, val_num=100, test_num=200, 
+                 num_chans_extract=21, channel_index=None, unit_ids=None, train_num=1200, val_num=100, test_num=200, 
                  trough_offset=42, spike_length_samples=121, plot=False):
     num_waveforms = train_num + val_num + test_num
     spikes_array = []
@@ -449,6 +456,7 @@ def make_dataset(bin_path, spike_index, geom, save_path, geom_dims=(1,2), we=Non
                 waveforms = we.get_waveforms("#{}".format(str(unit_id)))
                 waveforms = waveforms[:num_waveforms, :, depth_order]
                 templates = we.get_all_templates()
+                templates = templates[:, :, depth_order]
             else:
                 spike_frames_template = np.random.choice(spike_index[:,0][np.where(spike_index[:,2] == i)[0]], 
                                                          size=num_waveforms)
@@ -487,7 +495,14 @@ def make_dataset(bin_path, spike_index, geom, save_path, geom_dims=(1,2), we=Non
                     ax1.plot(templates[unit_id].T[mc_start:mc_end].flatten(), color='red')
                     ax1.axes.get_yaxis().set_visible(False)
                     ax1.axes.get_xaxis().set_visible(False)
+        
+        labels_train = np.array([[i for j in range(train_num)] for i in range(len(unit_ids))]).flatten()
+        labels_val = np.array([[i for j in range(val_num)] for i in range(len(unit_ids))]).flatten()
+        labels_test = np.array([[i for j in range(test_num)] for i in range(len(unit_ids))]).flatten()
 
+        np.save(os.path.join(save_path, 'labels_train.npy'), labels_train)
+        np.save(os.path.join(save_path, 'labels_val.npy'), labels_val)
+        np.save(os.path.join(save_path, 'labels_test.npy'), labels_test)
         fig.subplots_adjust(wspace=0, hspace=0.25)
     
     spikes_array = np.array(spikes_array)
