@@ -204,7 +204,7 @@ class WFDataset_lab(Dataset):
         return len(self.data)
 
 class ContrastiveLearningDataset:
-    def __init__(self, root_folder, lat_dim, multi_chan, use_chan_pos):
+    def __init__(self, root_folder, lat_dim, multi_chan, use_chan_pos=False):
         self.root_folder = root_folder
         self.lat_dim = lat_dim
         self.multi_chan = multi_chan

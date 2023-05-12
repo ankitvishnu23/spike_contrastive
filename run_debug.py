@@ -11,7 +11,7 @@ import torch.backends.cudnn as cudnn
 from torchvision import models
 from data_aug.contrastive_learning_dataset import ContrastiveLearningDataset, WFDataset_lab
 from models.model_simclr import ModelSimCLR, Projector, Projector2
-from simclr import SimCLR
+from simclr_debug import SimCLR
 from models.model_GPT import GPTConfig, Single_GPT
 from torch.nn.parallel import DistributedDataParallel as DDP
 

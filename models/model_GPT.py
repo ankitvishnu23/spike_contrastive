@@ -184,6 +184,15 @@ class Single_GPT(nn.Module):
         else:
             self.lm_head = nn.Linear(config.n_embd * config.block_size, config.out_dim, bias=False)
         
+        if self.config.use_chan_pos:
+            if self.config.add_layernorm:
+                self.chan_pos_enc = nn.Sequential(nn.Linear(config.n_coords, config.n_embd), LayerNorm(config.n_embd, bias=config.bias))
+            else:
+                if self.config.half_embed_each:
+                    self.chan_pos_enc = nn.Linear(config.n_coords, int(config.n_embd/2))
+                else:
+                    self.chan_pos_enc = nn.Linear(config.n_coords, config.n_embd)
+                    
         self.projector = Projector(rep_dim=config.out_dim, proj_dim=config.proj_dim)
         self.online_head = nn.Linear(config.out_dim, 10) # 10 classes
         
@@ -223,7 +232,7 @@ class Single_GPT(nn.Module):
         elif isinstance(module, nn.Embedding):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
-    def forward(self, idx, labels = None, targets=None):
+    def forward(self, idx, labels = None, targets=None, chan_pos=None):
         device = idx.device
         b, t, nc = idx.size()
         # print("t:", t, "block_size: ", self.config.block_size)
@@ -243,7 +252,20 @@ class Single_GPT(nn.Module):
         tok_emb = self.transformer.wte(idx) # token embeddings of shape (b, t, n_embd)
         pos_emb = self.transformer.wpe(pos) # position embeddings of shape (1, t, n_embd)
         
-        x = self.transformer.drop(tok_emb + pos_emb)
+        if self.config.use_chan_pos:
+            assert chan_pos is not None #          
+            chan_pos_emb = self.chan_pos_enc(chan_pos) # check this
+            if self.config.use_merge_layer:
+                tok_emb = self.merge_layer(torch.cat([chan_pos_emb, tok_emb], axis=-1))
+                x = self.transformer.drop(tok_emb + pos_emb)
+            elif self.config.half_embed_each:
+
+                tok_emb = torch.cat([chan_pos_emb, tok_emb], axis=-1)
+                x = self.transformer.drop(tok_emb + pos_emb)
+            else:
+                x = self.transformer.drop(tok_emb + pos_emb + chan_pos_emb)
+        else:
+            x = self.transformer.drop(tok_emb + pos_emb)
         for block in self.transformer.h:
             x = block(x)
         x = self.transformer.ln_f(x)

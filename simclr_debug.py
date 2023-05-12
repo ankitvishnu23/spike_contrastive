@@ -22,6 +22,56 @@ torch.manual_seed(0)
 import time
 from load_models import save_reps
 
+from ddp_utils import knn_predict
+import torch
+def knn_monitor2(net, memory_data_loader, test_data_loader, device='cuda', k=200, t=0.1, hide_progress=False,
+                targets=None, multi_chan=False):
+    if not targets:
+        targets = memory_data_loader.dataset.targets
+
+    net.eval()
+    classes = 100
+    total_top1, total_top5, total_num, feature_bank = 0.0, 0.0, 0, []
+    with torch.no_grad():
+        for data, target in memory_data_loader:
+            if not multi_chan:
+                data = torch.squeeze(data, dim=1)
+                data = torch.unsqueeze(data, dim=-1)
+            else:
+                data = data.view(-1, 11*121)
+                data = torch.unsqueeze(data, dim=-1)
+            
+            feature = net(data.to(device=device, non_blocking=True))
+            
+            feature = torch.nn.functional.normalize(feature, dim=1)
+            feature_bank.append(feature)
+        # [D, N]
+        feature_bank = torch.cat(feature_bank, dim=0).t().contiguous()
+        # [N]
+        feature_labels = torch.tensor(targets, device=feature_bank.device)
+        
+        # loop test data to predict the label by weighted knn search
+        for data, target in test_data_loader:
+            
+            data, target = data.to(device=device, non_blocking=True), target.to(device=device, non_blocking=True)
+            
+            if not multi_chan:
+                data = torch.squeeze(data, dim=1)
+                data = torch.unsqueeze(data, dim=-1)
+            else:
+                data = data.view(-1, 11*121)
+                data = torch.unsqueeze(data, dim=-1)
+            
+            feature = net(data)
+            
+            feature = torch.nn.functional.normalize(feature, dim=1)
+
+            pred_labels = knn_predict(feature, feature_bank, feature_labels, classes, k, t)
+
+            total_num += data.size(0)
+            total_top1 += (pred_labels[:, 0] == target).float().sum().item()
+    return total_top1 / total_num * 100
+
 class SimCLR(object):
 
     def __init__(self, *args, **kwargs):
@@ -182,6 +232,29 @@ class SimCLR(object):
                     knn_score = knn_monitor(net=self.model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True, args=self.args)
                     print(f"loss: {loss}, my knn_acc:{knn_score}")
                     self.logger.log_value('knn_score', knn_score, epoch_counter)
+                    knn_score = knn_monitor2(net=self.model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True, multi_chan=False)
+                    print(f"knn2 acc:{knn_score}")
+                    
+                    save_dict = {
+                    'epoch': epoch_counter,
+                    'arch': self.args.arch,
+                    'optimizer': self.optimizer.state_dict(),
+                    'state_dict': self.model.state_dict()
+                    }
+                    
+                    save_checkpoint(save_dict, is_best=False, filename=os.path.join(self.args.checkpoint_dir, 'checkpoint.pth'))
+                    print(f"Model checkpoint and metadata has been saved at {self.args.checkpoint_dir}.")
+                    logging.info(f"Model checkpoint and metadata has been saved at {self.args.checkpoint_dir}.")
+
+                    print("now running from load checkpoints")
+                    from load_models import load_ckpt, get_dataloader, save_reps
+                    single_data_path='/home/gridsan/evanv/charlotte/spike_data/single_mearec_random_neurons_05_10_2023'
+                    single_ckpt_path = f'./runs/debugknn/checkpoint.pth'
+                    model = load_ckpt(single_ckpt_path, multi_chan = False, rep_after_proj=True, rep_dim=128, proj_dim=5, dropout=0.0)
+                    single_train_loader = get_dataloader(single_data_path, multi_chan=False, split='train')
+                    single_test_loader = get_dataloader(single_data_path, multi_chan=False, split='test')
+                    knn_score = knn_monitor2(net=model.cuda(), memory_data_loader=single_train_loader, test_data_loader=single_test_loader, device='cuda',k=200, hide_progress=True, multi_chan=False)
+                    print("Single channel; knn rep AFTER proj:", knn_score)
                     
             if self.args.rank == 0 or not self.args.ddp:
                 logging.debug(f"Epoch: {epoch_counter}\tLoss: {loss}")
