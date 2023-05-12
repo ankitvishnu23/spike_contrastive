@@ -8,9 +8,12 @@ multi_data_path='/gpfs/wscgpfs02/shivsr/cloh/spike_data/multi_dy016_random_neuro
 # model = load_ckpt(multi_ckpt_path, multi_chan = True, rep_after_proj=True, use_chan_pos=True)
 # model2 = load_ckpt(multi_ckpt_path, multi_chan = True, rep_after_proj=False, use_chan_pos=True)
 
-multi_ckpt_path = '/gpfs/wscgpfs02/shivsr/cloh/spike_contrastive/saved_models/0510_mc_conseq_causal_n64_b1331_bs120_extra5_lr0.0005_poschan_mergelayer_layernorm/checkpoint_epoch500.pth'
-model = load_ckpt(multi_ckpt_path, multi_chan = True, rep_after_proj=True, use_chan_pos=True, use_merge_layer=True, add_layernorm=True)
-model2 = load_ckpt(multi_ckpt_path, multi_chan = True, rep_after_proj=False, use_chan_pos=True, use_merge_layer=True, add_layernorm=True)
+# multi_ckpt_path = '/gpfs/wscgpfs02/shivsr/cloh/spike_contrastive/saved_models/0510_mc_conseq_causal_n64_b1331_bs120_extra5_lr0.0001_poschan_half_embed/checkpoint_epoch350.pth'
+multi_ckpt_path = '/gpfs/wscgpfs02/shivsr/cloh/spike_contrastive/saved_models/0510_mc_conseq_causal_n64_b1331_bs120_extra5_lr0.0005_poschan_half_embed/checkpoint_epoch350.pth'
+
+# multi_ckpt_path = '/gpfs/wscgpfs02/shivsr/cloh/spike_contrastive/saved_models/0510_mc_conseq_causal_n64_b1331_bs120_extra5_lr0.0001_poschan_half_embed/checkpoint_epoch350.pth'
+model = load_ckpt(multi_ckpt_path, multi_chan = True, rep_after_proj=True, use_chan_pos=True, use_merge_layer=False, add_layernorm=False, half_embed_each=True)
+model2 = load_ckpt(multi_ckpt_path, multi_chan = True, rep_after_proj=False, use_chan_pos=True, use_merge_layer=False, add_layernorm=False, half_embed_each=True)
 
 train_loader = get_dataloader(multi_data_path, multi_chan=True, split='train', use_chan_pos=True)
 test_loader = get_dataloader(multi_data_path, multi_chan=True, split='test', use_chan_pos=True)
