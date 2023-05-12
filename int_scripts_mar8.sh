@@ -323,10 +323,10 @@ python \
       --add_train 
 
 python knn_eval.py \
-    --checkpoint-dir=/gpfs/wscgpfs02/shivsr/cloh/spike_contrastive/saved_models/0510_mc_conseq_causal_n64_b1331_bs120_extra5_lr0.0005_poschan_mergelayer_layernorm/checkpoint_epoch500.pth \
+    --checkpoint-dir=/gpfs/wscgpfs02/shivsr/cloh/spike_contrastive/saved_models/0510_mc_conseq_causal_n64_b1331_bs120_extra5_lr0.0005_poschan_mergelayer_layernorm/checkpoint.pth \
     --multi_chan --is_causal --batch-size=128 \
     --n_embd=64 --pos_enc=conseq \
-    --data=/gpfs/wscgpfs02/shivsr/cloh/spike_data/multi_mearec_random_neurons_05_10_2023 \
+    --data=/gpfs/wscgpfs02/shivsr/cloh/spike_data/multi_dy016_random_neurons_04_28_2023 \
     --block_size 1331 \
     --num_extra_chans 5 \
     --use_chan_pos \
