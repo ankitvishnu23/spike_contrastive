@@ -47,20 +47,20 @@ def main_worker(gpu, args):
     # define memory and test dataset for knn monitoring
     if not args.ddp:
         if args.multi_chan:
-            memory_dataset = WFDataset_lab(args.data, split='train', multi_chan=args.multi_chan, transform=Crop(prob=0.0, num_extra_chans=5, ignore_chan_num=True))
+            memory_dataset = WFDataset_lab(args.data, split='train', multi_chan=args.multi_chan, transform=Crop(prob=0.0, num_extra_chans=5, ignore_chan_num=True), use_chan_pos=args.use_chan_pos)
             memory_loader = torch.utils.data.DataLoader(
                 memory_dataset, batch_size=128, shuffle=False,
                 num_workers=args.workers, pin_memory=True, drop_last=False)
-            test_dataset = WFDataset_lab(args.data, split='test', multi_chan=args.multi_chan, transform=Crop(prob=0.0, num_extra_chans=5, ignore_chan_num=True))
+            test_dataset = WFDataset_lab(args.data, split='test', multi_chan=args.multi_chan, transform=Crop(prob=0.0, num_extra_chans=5, ignore_chan_num=True), use_chan_pos=args.use_chan_pos)
             test_loader = torch.utils.data.DataLoader(
                 test_dataset, batch_size=args.batch_size, shuffle=False,
                 num_workers=args.workers, pin_memory=True, drop_last=False)
         else:
-            memory_dataset = WFDataset_lab(args.data, split='train', multi_chan=False)
+            memory_dataset = WFDataset_lab(args.data, split='train', multi_chan=False, use_chan_pos=args.use_chan_pos)
             memory_loader = torch.utils.data.DataLoader(
                 memory_dataset, batch_size=128, shuffle=False,
                 num_workers=args.workers, pin_memory=True, drop_last=False)
-            test_dataset = WFDataset_lab(args.data, split='test', multi_chan=False)
+            test_dataset = WFDataset_lab(args.data, split='test', multi_chan=False, use_chan_pos=args.use_chan_pos)
             test_loader = torch.utils.data.DataLoader(
                 test_dataset, batch_size=args.batch_size, shuffle=False,
                 num_workers=args.workers, pin_memory=True, drop_last=False)
@@ -109,17 +109,21 @@ def main_worker(gpu, args):
                 data = torch.squeeze(data, dim=1)
                 data = torch.unsqueeze(data, dim=-1)
             else:
+                if args.use_chan_pos:
+                    data, chan_pos = data
                 data = data.view(-1, 11*121)
                 data = torch.unsqueeze(data, dim=-1)
-            
-            feature = model(data.cuda(gpu, non_blocking=True))
+            if args.use_chan_pos:
+                feature = model(data.cuda(gpu, non_blocking=True), chan_pos=chan_pos.cuda(gpu, non_blocking=True))
+            else:
+                feature = model(data.cuda(gpu, non_blocking=True))
             feature_bank.append(feature)
             
         feature_bank = torch.cat(feature_bank, dim=0)
         print(feature_bank.shape)
         
-        torch.save(feature_bank, os.path.join(ckpt_root_dir, 'test_reps.pt'))
-        print(f"saved test features to {ckpt_root_dir}/test_reps.pt")
+        torch.save(feature_bank, os.path.join(ckpt_root_dir, 'test_reps2.pt'))
+        print(f"saved test features to {ckpt_root_dir}/test_reps2.pt")
     
     feature_bank = []
     with torch.no_grad():
@@ -128,17 +132,21 @@ def main_worker(gpu, args):
                 data = torch.squeeze(data, dim=1)
                 data = torch.unsqueeze(data, dim=-1)
             else:
+                if args.use_chan_pos:
+                    data, chan_pos = data
                 data = data.view(-1, 11*121)
                 data = torch.unsqueeze(data, dim=-1)
-            
-            feature = model(data.cuda(gpu, non_blocking=True))
+            if args.use_chan_pos:
+                feature = model(data.cuda(gpu, non_blocking=True), chan_pos=chan_pos.cuda(gpu, non_blocking=True))
+            else:
+                feature = model(data.cuda(gpu, non_blocking=True))
             feature_bank.append(feature)
             
         feature_bank = torch.cat(feature_bank, dim=0)
         print(feature_bank.shape)
         
-        torch.save(feature_bank, os.path.join(ckpt_root_dir, 'train_reps.pt'))
-        print(f"saved train features to {ckpt_root_dir}/train_reps.pt")
+        torch.save(feature_bank, os.path.join(ckpt_root_dir, 'train_reps2.pt'))
+        print(f"saved train features to {ckpt_root_dir}/train_reps2.pt")
 
 def make_sh_and_submit(args):
     os.makedirs('./scripts/', exist_ok=True)
@@ -248,7 +256,13 @@ if __name__ == "__main__":
     parser.add_argument('--pos_enc', default ='conseq', type=str)    
     parser.add_argument('--no_collide', action='store_true') # default = False
     parser.add_argument('--ignore_proj', action='store_true') # default = False
-    
+    parser.add_argument('--use_chan_pos', action='store_true') # default = False
+    parser.add_argument('--use_merge_layer', action='store_true') # default = False
+    parser.add_argument('--add_layernorm', action='store_true') # default = False
+    parser.add_argument('--num_extra_chans', default=0, type=int)
+
+    parser.add_argument('--half_embed_each', action='store_true') # default = False
+  
     args = parser.parse_args()
     
     if args.submit:
@@ -271,5 +285,6 @@ python knn_eval.py --checkpoint-dir=/gpfs/u/home/BNSS/BNSSlhch/scratch/spike_ddp
 
 python knn_eval.py --checkpoint-dir=./ddp_models/0502_mc_gpt_conseq_causal_nembd64_block1331_bs128_extra5_lr0.0001_knn10_addtrain/checkpoint.pth --multi_chan --is_causal --batch-size=128 --n_embd=64 --pos_enc=conseq --data=/home/gridsan/cloh/spike_data/multi_dy016_random_neurons_04_28_2023
 
+python knn_eval.py --checkpoint-dir=/gpfs/wscgpfs02/shivsr/cloh/spike_contrastive/saved_models/0510_mc_conseq_causal_n64_b1331_bs120_extra5_lr0.0005_poschan_mergelayer_layernorm/checkpoint.pth --multi_chan --is_causal --batch-size=128 --n_embd=64 --pos_enc=conseq --data=/home/gridsan/cloh/spike_data/multi_dy016_random_neurons_04_28_2023
 
 """

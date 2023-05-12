@@ -21,16 +21,17 @@ class Args:
     num_extra_chans: int = 5
 args = Args()
 
-save_reps(model.cuda(), test_loader, multi_ckpt_path, split='test', multi_chan=True, rep_after_proj=False, use_chan_pos=True)
-save_reps(model.cuda(), train_loader, multi_ckpt_path, split='train', multi_chan=True, rep_after_proj=False, use_chan_pos=True)
+save_reps(model.cuda(), test_loader, multi_ckpt_path, split='test', multi_chan=True, rep_after_proj=True, use_chan_pos=True)
+save_reps(model.cuda(), train_loader, multi_ckpt_path, split='train', multi_chan=True, rep_after_proj=True, use_chan_pos=True)
+
+
+knn_score = knn_monitor(net=model.cuda(), memory_data_loader=train_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True, args=args)
+print("knn if rep AFTER proj:", knn_score)
 
 
 save_reps(model2.cuda(), test_loader, multi_ckpt_path, split='test', multi_chan=True, rep_after_proj=False, use_chan_pos=True)
 save_reps(model2.cuda(), train_loader, multi_ckpt_path, split='train', multi_chan=True, rep_after_proj=False, use_chan_pos=True)
 
-
-knn_score = knn_monitor(net=model.cuda(), memory_data_loader=train_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True, args=args)
-print("knn if rep AFTER proj:", knn_score)
 
 knn_score = knn_monitor(net=model2.cuda(), memory_data_loader=train_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True, args=args)
 print("knn if rep BEFORE proj:", knn_score)
