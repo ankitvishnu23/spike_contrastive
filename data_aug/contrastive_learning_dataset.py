@@ -224,7 +224,7 @@ class ContrastiveLearningDataset:
         return data_transforms
 
     @staticmethod
-    def get_wf_pipeline_transform(self, temp_cov_fn, spatial_cov_fn, noise_scale, num_extra_chans):
+    def get_wf_pipeline_transform(self, temp_cov_fn, spatial_cov_fn, noise_scale, num_extra_chans, normalize):
         temporal_cov = np.load(os.path.join(self.root_folder, temp_cov_fn))
         spatial_cov = np.load(os.path.join(self.root_folder, spatial_cov_fn))
         """Return a set of data augmentation transformations on waveforms."""
@@ -232,7 +232,8 @@ class ContrastiveLearningDataset:
                                             transforms.RandomApply([AmpJitter()], p=0.7),
                                               transforms.RandomApply([Jitter()], p=0.6),
                                             #   transforms.RandomApply([PCA_Reproj(root_folder=self.root_folder)], p=0.4),
-                                              transforms.RandomApply([SmartNoise(self.root_folder, temporal_cov, spatial_cov, noise_scale)], p=0.5),
+                                              transforms.RandomApply([SmartNoise(self.root_folder, temporal_cov, 
+                                                                                 spatial_cov, noise_scale, normalize)], p=0.5),
                                               transforms.RandomApply([Collide(self.root_folder, multi_chan=self.multi_chan)], p=0.4),
                                               Crop(num_extra_chans=num_extra_chans),
                                               ToWfTensor()])
@@ -246,7 +247,7 @@ class ContrastiveLearningDataset:
         
         return data_transforms
 
-    def get_dataset(self, name, n_views, noise_scale=1.0, num_extra_chans=0):
+    def get_dataset(self, name, n_views, noise_scale=1.0, num_extra_chans=0, normalize=False):
         temp_cov_fn = 'temporal_cov_example.npy'    
         spatial_cov_fn = 'spatial_cov_example.npy'
         if self.multi_chan:
@@ -256,7 +257,7 @@ class ContrastiveLearningDataset:
                                                                   self.get_wf_pipeline_transform(self, temp_cov_fn,
                                                                   spatial_cov_fn,
                                                                 #   noise_scale), self.get_pca_transform(self),
-                                                                  noise_scale, 0), None,
+                                                                  noise_scale, 0, normalize), None,
                                                                   n_views),
                                                                   target_transform=LabelViewGenerator()),
                           'wfs_multichan': lambda: WF_MultiChan_Dataset(self.root_folder, use_chan_pos=self.use_chan_pos,

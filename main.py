@@ -101,7 +101,7 @@ def main_worker(gpu, args):
 
     num_extra_chans = args.num_extra_chans if args.multi_chan else 0
     ds = ContrastiveLearningDataset(args.data, args.out_dim, multi_chan=args.multi_chan, use_chan_pos=args.use_chan_pos)
-    dataset = ds.get_dataset('wfs', 2, args.noise_scale, num_extra_chans)
+    dataset = ds.get_dataset('wfs', 2, args.noise_scale, num_extra_chans, normalize=args.cell_type)
     
     if args.ddp:
         sampler = torch.utils.data.distributed.DistributedSampler(dataset, drop_last=True)
@@ -467,6 +467,7 @@ if __name__ == "__main__":
     parser.add_argument('--use_chan_pos', action='store_true') # default = False
     parser.add_argument('--use_merge_layer', action='store_true') # default = False
     parser.add_argument('--add_layernorm', action='store_true') # default = False
+    parser.add_argument('--cell_type', action='store_true') # default = False
 
     parser.add_argument('--half_embed_each', action='store_true') # default = False
     args = parser.parse_args()
