@@ -141,7 +141,10 @@ class SmartNoise(object):
             chan_nums[chan_nums < 0] = 0
             
         chan_nums = chan_nums.astype(int) # sometimes chan_nums is a float
-        noise_to_add = self.normalize_wf(the_noise[:, chan_nums].T) if self.normalize else the_noise[:, chan_nums].T
+        noise_to_add = the_noise[:, chan_nums].T
+        noise_to_add = self.normalize_wf(noise_to_add) if self.normalize else noise_to_add
+        
+        # noise_to_add = self.normalize_wf(the_noise[:, chan_nums].T) if self.normalize else the_noise[:, chan_nums].T
         noise_wfs = self.noise_scale * noise_to_add
         wf = wf + noise_wfs
 
@@ -150,7 +153,7 @@ class SmartNoise(object):
 
         return [wf, chan_nums, chan_locs]
     
-    def normalize_wf(wf):
+    def normalize_wf(self, wf):
         if len(wf.shape) == 1:
             _ = wf.shape
             n_chans = None

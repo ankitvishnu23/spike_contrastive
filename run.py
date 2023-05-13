@@ -73,7 +73,7 @@ def main_worker(gpu, args):
     
     dataset = ContrastiveLearningDataset(args.data, args.out_dim, multi_chan=args.multi_chan)
 
-    train_dataset = dataset.get_dataset(args.dataset_name, args.n_views, args.noise_scale, num_extra_chans)
+    train_dataset = dataset.get_dataset(args.dataset_name, args.n_views, args.noise_scale, num_extra_chans, normalize=args.cell_type)
     print("ddp:", args.ddp)
     
     if args.ddp:
@@ -208,7 +208,7 @@ def make_sh_and_submit(args):
 if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='PyTorch SimCLR')
-    parser.add_argument('--data', metavar='DIR', default='/home/gridsan/cloh/spike_contrastive/datasets/single_dy016_random_neurons_04_28_2023/',
+    parser.add_argument('--data', metavar='DIR', default='/home/gridsan/cloh/spike_data/single_dy016_random_neurons_04_28_2023/',
                         help='path to dataset')
     parser.add_argument('-dataset-name', default='wfs',
                         help='dataset name', choices=['wfs', 'stl10', 'cifar10'])
@@ -284,7 +284,8 @@ if __name__ == "__main__":
     parser.add_argument('--num_extra_chans', default=0, type=int)
     parser.add_argument('--add_train', action='store_true') # default = False
     parser.add_argument('--use_chan_pos', action='store_true') # default = False
-  
+    parser.add_argument('--cell_type', action='store_true') # default = False
+
     args = parser.parse_args()
     
     print("MULTICHAN", args.multi_chan)
