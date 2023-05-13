@@ -10,7 +10,7 @@ class Encoder(torch.nn.Module):
         if multi_chan:
             model_args = dict(bias=False, block_size=1331, n_layer=20, n_head =4, n_embd=64, dropout=0.2, out_dim=5, proj_dim=5, is_causal=True, pos = pos_enc, multi_chan=True, use_chan_pos=use_chan_pos, use_merge_layer=use_merge_layer, add_layernorm=add_layernorm, half_embed_each=half_embed_each)
         else:
-            model_args = dict(bias=False, block_size=121, n_layer=20, n_head =4, n_embd=32, dropout=0.2, out_dim=rep_dim, proj_dim=proj_dim, is_causal=True, pos = pos_enc, multi_chan=False)
+            model_args = dict(bias=False, block_size=121, n_layer=20, n_head =4, n_embd=32, dropout=dropout, out_dim=rep_dim, proj_dim=proj_dim, is_causal=True, pos = pos_enc, multi_chan=False)
         gptconf = GPTConfig(**model_args)
         if multi_chan:
             self.backbone = Multi_GPT(gptconf)
@@ -63,6 +63,7 @@ def get_dataloader(data_path, multi_chan=False, split='train', use_chan_pos=Fals
     if multi_chan:
         dataset = WFDataset_lab(data_path, split=split, multi_chan=True, use_chan_pos=use_chan_pos,transform=Crop(prob=0.0, num_extra_chans=5, ignore_chan_num=True))
     else:
+        print("Loading single channel data")
         dataset = WFDataset_lab(data_path, split=split, multi_chan=False)
         
     loader = torch.utils.data.DataLoader(

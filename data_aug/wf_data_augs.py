@@ -94,7 +94,7 @@ class SmartNoise(object):
     temporal_name = 'temporal_cov_example.npy'
     spatial_name = 'spatial_cov_example.npy'
 
-    def __init__(self, root_folder=None, temporal_cov=None, spatial_cov=None, noise_scale=1.0):
+    def __init__(self, root_folder=None, temporal_cov=None, spatial_cov=None, noise_scale=1.0, normalize=False):
         if root_folder is not None:
             self.root_folder = root_folder
         if temporal_cov is None:
@@ -105,6 +105,7 @@ class SmartNoise(object):
         self.spatial_cov = spatial_cov
         # self.noise_scale = np.float64(noise_scale)
         self.noise_scale = np.float32(noise_scale)
+        self.normalize = normalize
         
 
     def __call__(self, sample):
@@ -140,13 +141,25 @@ class SmartNoise(object):
             chan_nums[chan_nums < 0] = 0
             
         chan_nums = chan_nums.astype(int) # sometimes chan_nums is a float
-        noise_wfs = self.noise_scale * the_noise[:, chan_nums].T
+        noise_to_add = self.normalize_wf(the_noise[:, chan_nums].T) if self.normalize else the_noise[:, chan_nums].T
+        noise_wfs = self.noise_scale * noise_to_add
         wf = wf + noise_wfs
 
         if chan_locs is None:
             return [wf, chan_nums]
 
         return [wf, chan_nums, chan_locs]
+    
+    def normalize_wf(wf):
+        if len(wf.shape) == 1:
+            _ = wf.shape
+            n_chans = None
+        else:
+            n_chans, _ = wf.shape
+        wf = wf.flatten()
+        wf /= np.max(np.abs(wf),axis=0)
+        wf = wf.reshape(n_chans, -1) if n_chans is not None else wf
+        return wf
 
 
 class Collide(object):

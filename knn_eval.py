@@ -86,14 +86,24 @@ def main_worker(gpu, args):
         raise ValueError("Checkpoint not found")
     else:
         print("loading from previous checkpoint: ", args.checkpoint_dir)
+        
         ckpt = torch.load(args.checkpoint_dir,
-                          map_location='cpu')
-        start_epoch = ckpt['epoch']
-        nonddp_state_dict = {k.replace('module.', ''): v for k, v in ckpt['model'].items()}
+                            map_location='cpu')
+        if args.multi_chan:
+            start_epoch = ckpt['epoch']
+            nonddp_state_dict = {k.replace('module.', ''): v for k, v in ckpt['model'].items()}
+            model.load_state_dict(nonddp_state_dict)
+
+        else:
+            start_epoch = ckpt['epoch']
+            
+            nonddp_state_dict = {'backbone.'+k: v for k,v in ckpt['state_dict'].items() if 'projector' not in k}
+            nonddp_state_dict.update({k: v for k,v in ckpt['state_dict'].items() if 'projector' in k})
+            m, uek = model.load_state_dict(nonddp_state_dict, strict=False)
+            
         # print("from file")
         # print(nonddp_state_dict.keys())
         
-        model.load_state_dict(nonddp_state_dict)
 
     knn_score = knn_monitor(net=model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True, args=args)
     print(f"Epoch {start_epoch}, knn_acc:{knn_score}")
@@ -286,5 +296,7 @@ python knn_eval.py --checkpoint-dir=/gpfs/u/home/BNSS/BNSSlhch/scratch/spike_ddp
 python knn_eval.py --checkpoint-dir=./ddp_models/0502_mc_gpt_conseq_causal_nembd64_block1331_bs128_extra5_lr0.0001_knn10_addtrain/checkpoint.pth --multi_chan --is_causal --batch-size=128 --n_embd=64 --pos_enc=conseq --data=/home/gridsan/cloh/spike_data/multi_dy016_random_neurons_04_28_2023
 
 python knn_eval.py --checkpoint-dir=/gpfs/wscgpfs02/shivsr/cloh/spike_contrastive/saved_models/0510_mc_conseq_causal_n64_b1331_bs120_extra5_lr0.0005_poschan_mergelayer_layernorm/checkpoint.pth --multi_chan --is_causal --batch-size=128 --n_embd=64 --pos_enc=conseq --data=/home/gridsan/cloh/spike_data/multi_dy016_random_neurons_04_28_2023
+
+python knn_eval.py --out_dim=128 --proj_dim=5 --batch-size=512 --lr=0.001 --epochs=800 --fp16 --use_gpt --is_causal --n_embd=32 --dropout=0.0 --data=/home/gridsan/evanv/charlotte/spike_data/single_mearec_random_neurons_05_10_2023 --checkpoint-dir=/home/gridsan/evanv/charlotte/spike_contrastive/runs/0511out_dim128proj_dim5batch-size512lr0.001epochs800fp16use_gptis_causaln_embd32add_traindropout0.0/checkpoint.pth 
 
 """
