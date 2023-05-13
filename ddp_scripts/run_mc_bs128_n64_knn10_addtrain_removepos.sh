@@ -26,7 +26,7 @@ python \
       --log-dir $HOME2/scratch/spike_contrastive/logs/ \
       --ngpus-per-node 4 \
       --nodes 4 \
-      --exp 0507_mc_gpt_conseq_causal_nembd64_block1331_bs128_extra5_lr${lr}_knn10_addtrain_chanpos \
+      --exp 0512_mc_gpt_conseq_causal_nembd64_block1331_bs128_extra5_lr${lr}_knn10_addtrain_removepos \
       --block_size 1331 \
       --n_embd 64 \
       --multi_chan \
@@ -35,7 +35,8 @@ python \
       --num_extra_chans 5 \
       --knn-freq 10 \
       --add_train \
-      --use_chan_pos
+      --remove_pos
+
 done
 echo "Run completed at:- "
 date

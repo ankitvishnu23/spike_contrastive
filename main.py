@@ -73,7 +73,7 @@ def main_worker(gpu, args):
 
     if args.ddp:
         model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
-        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[gpu])
+        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[gpu],find_unused_parameters=True)
 
     if args.optimizer == 'lars':
         optimizer = LARS(model.parameters(), lr=0, weight_decay=args.weight_decay,
@@ -101,7 +101,7 @@ def main_worker(gpu, args):
 
     num_extra_chans = args.num_extra_chans if args.multi_chan else 0
     ds = ContrastiveLearningDataset(args.data, args.out_dim, multi_chan=args.multi_chan, use_chan_pos=args.use_chan_pos)
-    dataset = ds.get_dataset('wfs', 2, args.noise_scale, num_extra_chans)
+    dataset = ds.get_dataset('wfs', 2, args.noise_scale, num_extra_chans, p_crop=args.p_crop)
     
     if args.ddp:
         sampler = torch.utils.data.distributed.DistributedSampler(dataset, drop_last=True)
@@ -258,7 +258,7 @@ class SimCLR(nn.Module):
                   proj_dim=args.proj_dim, pos=args.pos_enc, multi_chan=args.multi_chan, 
                   use_chan_pos=args.use_chan_pos, n_extra_chans=num_extra_chans,
                   add_layernorm=args.add_layernorm, use_merge_layer=args.use_merge_layer,
-                  half_embed_each=args.half_embed_each
+                  half_embed_each=args.half_embed_each, remove_pos = args.remove_pos
                   ) 
         gptconf = GPTConfig(**model_args)
         self.backbone = Multi_GPT(gptconf)
@@ -469,6 +469,9 @@ if __name__ == "__main__":
     parser.add_argument('--add_layernorm', action='store_true') # default = False
 
     parser.add_argument('--half_embed_each', action='store_true') # default = False
+    parser.add_argument('--remove_pos', action='store_true') # default = False
+    parser.add_argument('--p_crop', default=0.5, type=float)
+    
     args = parser.parse_args()
     
     main(args)

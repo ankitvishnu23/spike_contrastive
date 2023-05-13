@@ -12,7 +12,7 @@ ulimit -s unlimited
 
 for lr in 0.001 0.0001
 do
-for pdim in 5 3
+for pdim in 5 
 do
 python \
       $HOME2/scratch/spike_contrastive/launcher.py \
