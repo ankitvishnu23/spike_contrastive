@@ -147,6 +147,7 @@ parser.add_argument('--half_embed_each', action='store_true') # default = False
 parser.add_argument('--remove_pos', action='store_true') # default = False
 
 parser.add_argument('--p_crop', default=0.5, type=float)
+parser.add_argument('--cell_type', action='store_true') # default = False
 
 # wsc setting
 parser.add_argument('--world-size', default=-1, type=int,
