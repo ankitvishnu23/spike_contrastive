@@ -71,6 +71,7 @@ class CausalSelfAttention(nn.Module):
         # flash attention make GPU go brrrrr but support is only in PyTorch >= 2.0
         # self.flash = hasattr(torch.nn.functional, 'scaled_dot_product_attention')
         self.flash = False
+        self.tot_chans = config.n_extra_chans * 2 + 1
         if not self.flash:
             if self.is_causal:
                 print("WARNING: using slow attention. Flash Attention requires PyTorch >= 2.0")
@@ -79,7 +80,12 @@ class CausalSelfAttention(nn.Module):
                                             # .view(1, 1, config.block_size, config.block_size))
                 # create special causal mask in time dimension
                 if config.multi_chan:
-                    self.register_buffer("bias", torch.tril(torch.ones(121, 121)).repeat(11,11)
+                    if config.concat_pos:
+                        assert config.block_size == 122 * self.tot_chans
+                        self.register_buffer("bias", torch.tril(torch.ones(122, 122)).repeat(self.tot_chans,self.tot_chans)
+                                            .view(1, 1, config.block_size, config.block_size))
+                    else:
+                        self.register_buffer("bias", torch.tril(torch.ones(121, 121)).repeat(self.tot_chans,self.tot_chans)
                                             .view(1, 1, config.block_size, config.block_size))
                 else:
                     self.register_buffer("bias", torch.tril(torch.ones(config.block_size, config.block_size))
@@ -163,6 +169,7 @@ class GPTConfig:
     add_layernorm: bool = False
     half_embed_each: bool = False
     remove_pos: bool = False
+    concat_pos: bool = False
 
 class Single_GPT(nn.Module):
 
@@ -572,7 +579,10 @@ class Multi_GPT(nn.Module):
                 elif self.config.pos == 'block_11times':
                     pos = torch.cat([torch.Tensor([i]).long().repeat(121) for i in range(self.tot_chans)]).unsqueeze(0).to(device)
                 else:
-                    pos = torch.arange(0, t, dtype=torch.long, device=device).unsqueeze(0) # shape (1, t)
+                    if self.config.concat_pos:
+                        pos = torch.arange(0, t+11, dtype=torch.long, device=device).unsqueeze(0) # shape (1, t)
+                    else:
+                        pos = torch.arange(0, t, dtype=torch.long, device=device).unsqueeze(0) # shape (1, t)
             else:
                 pos = torch.arange(0, t, dtype=torch.long, device=device).unsqueeze(0) # shape (1, t)
         else:
@@ -584,7 +594,22 @@ class Multi_GPT(nn.Module):
         tok_emb = self.transformer.wte(idx) # token embeddings of shape (b, t, n_embd)
         if pos is not None:
             pos_emb = self.transformer.wpe(pos) # position embeddings of shape (1, t, n_embd)
-        if self.config.use_chan_pos:
+        if self.config.use_chan_pos and self.config.concat_pos:
+            assert chan_pos is not None # chan_pos is B x num_channels x 2 
+            chan_pos_emb = self.chan_pos_enc(chan_pos) # B x num_channels x n_embd
+            new_emb = torch.zeros(b, t+self.tot_chans, self.config.n_embd).to(device)
+            tok_emb_per_chan = tok_emb.chunk(self.tot_chans, dim=1)
+            chan_pos_per_chan = chan_pos_emb.chunk(self.tot_chans, dim=1)
+            for i in range(self.tot_chans):
+                new_emb[:, i*122:(i+1)*122, :] = torch.cat([chan_pos_per_chan[i], tok_emb_per_chan[i]], dim=1)
+            # new_emb[:, :122, :] = torch.cat([tok_emb_per_chan[0], chan_pos_per_chan[0]], dim=1)
+            # new_emb[:, 122:2*122, :] = torch.cat([tok_emb_per_chan[1], chan_pos_per_chan[1]], dim=1)
+            if not self.config.remove_pos:
+                x = self.transformer.drop(new_emb + pos_emb)
+            else:
+                x = self.transformer.drop(new_emb)
+                    
+        elif self.config.use_chan_pos:
             assert chan_pos is not None # chan_pos is B x num_channels x 2            
             ext_chan_pos = torch.cat([chan_pos[:, i].repeat(1, 121).reshape(b, 121, -1) for i in range(self.tot_chans)], axis=1) # B x num_channels*121 x 2
             # ext_chan_pos = torch.cat([torch.Tensor(chan_pos[:, i]).repeat(1, 121).reshape(b, 121, -1) for i in range(self.tot_chans)], axis=1)

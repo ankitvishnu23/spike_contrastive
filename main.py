@@ -175,7 +175,7 @@ def main_worker(gpu, args):
             if args.use_chan_pos:
                 chan_pos = chan_pos.cuda(gpu, non_blocking=True)
                 chan_pos2 = chan_pos2.cuda(gpu, non_blocking=True)
-
+            
             labels = labels.cuda(gpu, non_blocking=True)
             if args.optimizer != 'adam':
                 lr = adjust_learning_rate(args, optimizer, loader, step)
@@ -258,7 +258,8 @@ class SimCLR(nn.Module):
                   proj_dim=args.proj_dim, pos=args.pos_enc, multi_chan=args.multi_chan, 
                   use_chan_pos=args.use_chan_pos, n_extra_chans=num_extra_chans,
                   add_layernorm=args.add_layernorm, use_merge_layer=args.use_merge_layer,
-                  half_embed_each=args.half_embed_each, remove_pos = args.remove_pos
+                  half_embed_each=args.half_embed_each, remove_pos = args.remove_pos,
+                  concat_pos=args.concat_pos
                   ) 
         gptconf = GPTConfig(**model_args)
         self.backbone = Multi_GPT(gptconf)
@@ -476,6 +477,8 @@ if __name__ == "__main__":
     parser.add_argument('--remove_pos', action='store_true') # default = False
     parser.add_argument('--p_crop', default=0.5, type=float)
     parser.add_argument('--detected_spikes', action='store_true') # default = False
+    parser.add_argument('--concat_pos', action='store_true') # default = False
+    
     
     args = parser.parse_args()
     

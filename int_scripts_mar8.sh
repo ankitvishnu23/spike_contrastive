@@ -351,7 +351,7 @@ python knn_eval.py \
 
 
 python main.py \
-      --data /gpfs/u/home/BNSS/BNSSlhch/scratch/spike_data/multi_dy016_random_neurons_04_28_2023 \
+      --data /gpfs/u/home/BNSS/BNSSlhch/scratch/spike_data/multi_dy016_random_neurons_05_13_2023 \
       --workers 32 \
       --epochs 800 \
       --batch-size 4 \
@@ -363,7 +363,7 @@ python main.py \
       --log-dir /gpfs/u/home/BNSS/BNSSlhch/scratch/spike_contrastive/logs/ \
       --ngpus-per-node 4 \
       --nodes 4 \
-      --exp test_removepos \
+      --exp test_concat \
       --block_size 1331 \
       --n_embd 64 \
       --multi_chan \
@@ -372,7 +372,7 @@ python main.py \
       --num_extra_chans 5 \
       --knn-freq 10 \
       --add_train \
-      --remove_pos
+      --use_chan_pos 
 
 python \
       /gpfs/wscgpfs02/shivsr/cloh/spike_contrastive/main.py \
@@ -420,3 +420,56 @@ done
 done
 done
 done
+
+for bs in 512 
+do
+for lr in 0.001 0.0005
+do
+for nembd in 32 
+do
+for dim in 5
+do
+python run.py --add_prefix=0513data --submit --arg_str="--out_dim=128 --proj_dim=${dim} --batch-size=${bs} --lr=${lr} --epochs=800 --fp16 --use_gpt --is_causal --n_embd=${nembd} --add_train --data=/home/gridsan/evanv/charlotte/spike_data/single_dy016_random_neurons_05_13_2023 "
+done
+done
+done
+done
+
+for bs in 512 
+do
+for lr in 0.001
+do
+for nembd in 32 
+do
+for dim in 5
+do
+python run.py --add_prefix=0513data --submit --arg_str="--out_dim=128 --proj_dim=${dim} --batch-size=${bs} --lr=${lr} --epochs=800 --fp16 --use_gpt --is_causal --n_embd=${nembd} --add_train --dropout=0.0 --data=/home/gridsan/evanv/charlotte/spike_data/single_dy016_random_neurons_05_13_2023 "
+done
+done
+done
+done
+
+python main.py \
+      --data /gpfs/u/home/BNSS/BNSSlhch/scratch/spike_data/multi_dy016_random_neurons_05_13_2023\
+             --workers 32\
+                    --epochs 800       \
+                    --batch-size 4       \
+                    --out_dim 5     \
+                    --proj_dim 5      \
+                     --optimizer adam      \
+                      --learning-rate 0.0001    \
+                         --checkpoint-dir /gpfs/u/home/BNSS/BNSSlhch/scratch/spike_contrastive/saved_models/       \
+                         --log-dir /gpfs/u/home/BNSS/BNSSlhch/scratch/spike_contrastive/logs/       \
+                         --ngpus-per-node 4       \
+                         --nodes 4       \
+                         --exp test_concat       \
+                         --block_size 1342      \
+                         --n_embd 64       \
+                         --multi_chan       \
+                         --pos_enc conseq      \
+                          --is_causal       \
+                          --num_extra_chans 5       \
+                          --knn-freq 10       \
+                          --add_train       \
+                          --use_chan_pos \
+                          --concat_pos
