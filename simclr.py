@@ -225,3 +225,7 @@ class SimCLR(object):
             # }, is_best=False, filename=os.path.join('./runs', checkpoint_name))
             logging.info(f"Model checkpoint and metadata has been saved at {self.args.checkpoint_dir}.")
         
+            save_reps(self.model, test_loader, os.path.join(self.args.checkpoint_dir, 'final.pth'), split='test', multi_chan=False, rep_after_proj=True, use_chan_pos=False, suffix='')
+            save_reps(self.model, memory_loader, os.path.join(self.args.checkpoint_dir, 'final.pth'), split='test', multi_chan=False, rep_after_proj=True, use_chan_pos=False, suffix='')
+            
+            

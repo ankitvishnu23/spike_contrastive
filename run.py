@@ -98,7 +98,7 @@ def main_worker(gpu, args):
             memory_dataset, batch_size=args.batch_size, shuffle=False,
             num_workers=args.workers, pin_memory=True, drop_last=False)
         
-        test_dataset = WFDataset_lab(args.data, split='test', multi_chan=args.multi_chan)
+        test_dataset = WFDataset_lab(args.data, split=args.test_split, multi_chan=args.multi_chan)
         test_loader = torch.utils.data.DataLoader(
             test_dataset, batch_size=args.batch_size, shuffle=False,
             num_workers=args.workers, pin_memory=True, drop_last=False)
@@ -287,6 +287,7 @@ if __name__ == "__main__":
     parser.add_argument('--cell_type', action='store_true') # default = False
     parser.add_argument('--detected_spikes', action='store_true') # default = False
     parser.add_argument('--no_knn', action='store_true') # default = False
+    parser.add_argument('--test_split', default ='test', type=str)    
 
     args = parser.parse_args()
     

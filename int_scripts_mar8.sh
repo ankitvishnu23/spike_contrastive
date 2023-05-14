@@ -472,4 +472,159 @@ python main.py \
                           --knn-freq 10       \
                           --add_train       \
                           --use_chan_pos \
+                          --concat_pos\
+
+
+for bs in 512 
+do
+for lr in 0.001
+do
+for nembd in 32 
+do
+for dim in 5
+do
+python run.py --add_prefix=0514 --submit --arg_str="--out_dim=128 --proj_dim=${dim} --batch-size=${bs} --lr=${lr} --epochs=800 --fp16 --use_gpt --is_causal --n_embd=${nembd} --add_train --detected_spikes --no_knn --dropout=0.0 --data=/home/gridsan/evanv/charlotte/spike_data/single_dy016_detected_spikes_05_13_2023 "
+done
+done
+done
+done
+
+for bs in 512 
+do
+for lr in 0.001
+do
+for nembd in 32 
+do
+for dim in 5
+do
+python run.py --add_prefix=0514 --submit --arg_str="--out_dim=128 --proj_dim=${dim} --batch-size=${bs} --lr=${lr} --epochs=800 --fp16 --use_gpt --is_causal --n_embd=${nembd} --add_train --detected_spikes --no_knn --dropout=0.0 --test_split=val --data=/home/gridsan/evanv/charlotte/spike_data/single_dy016_detected_spikes_05_13_2023 "
+done
+done
+done
+done
+
+for bs in 512 
+do
+for lr in 0.001
+do
+for nembd in 32 
+do
+for dim in 5
+do
+python run.py --add_prefix=0513data --submit --arg_str="--out_dim=128 --proj_dim=${dim} --batch-size=${bs} --lr=${lr} --epochs=800 --fp16 --use_gpt --is_causal --n_embd=${nembd} --add_train --dropout=0.0 --test_split=val --data=/home/gridsan/evanv/charlotte/spike_data/single_dy016_random_neurons_05_13_2023 "
+done
+done
+done
+done
+
+for bs in 512 
+do
+for lr in 0.001
+do
+for nembd in 32 
+do
+for dim in 5
+do
+python run.py --add_prefix=0514_mearec --submit --arg_str="--out_dim=128 --proj_dim=${dim} --batch-size=${bs} --lr=${lr} --epochs=800 --fp16 --use_gpt --is_causal --n_embd=${nembd} --add_train --dropout=0.0 --data=/home/gridsan/evanv/charlotte/spike_data/single_mearec_random_neurons_05_14_2023 "
+done
+done
+done
+done
+
+for bs in 512 
+do
+for lr in 0.001
+do
+for nembd in 32 
+do
+for dim in 5
+do
+python run.py --add_prefix=0514_mearec --submit --arg_str="--out_dim=128 --proj_dim=${dim} --batch-size=${bs} --lr=${lr} --epochs=800 --fp16 --use_gpt --is_causal --n_embd=${nembd} --add_train --dropout=0.0 --test_split=val --data=/home/gridsan/evanv/charlotte/spike_data/single_mearec_random_neurons_05_14_2023 "
+done
+done
+done
+done
+
+python main.py \
+      --data /gpfs/u/home/BNSS/BNSSlhch/scratch/spike_data/multi_mearec_random_neurons_05_14_2023\
+             --workers 32\
+                    --epochs 800       \
+                    --batch-size 4       \
+                    --out_dim 5     \
+                    --proj_dim 5      \
+                     --optimizer adam      \
+                      --learning-rate 0.0001    \
+                         --checkpoint-dir /gpfs/u/home/BNSS/BNSSlhch/scratch/spike_contrastive/saved_models/       \
+                         --log-dir /gpfs/u/home/BNSS/BNSSlhch/scratch/spike_contrastive/logs/       \
+                         --ngpus-per-node 4       \
+                         --nodes 4       \
+                         --exp test_mearec       \
+                         --block_size 1331      \
+                         --n_embd 64       \
+                         --multi_chan       \
+                         --pos_enc conseq      \
+                          --is_causal       \
+                          --num_extra_chans 5       \
+                          --knn-freq 10       \
+                          --add_train       
+
+
+for bs in 512 
+do
+for lr in 0.001 
+do
+for nembd in 32 
+do
+for dim in 5
+do
+python run.py --add_prefix=0514cellrand --submit --arg_str="--out_dim=128 --proj_dim=${dim} --batch-size=${bs} --lr=${lr} --epochs=800 --fp16 --use_gpt --is_causal --n_embd=${nembd} --add_train --dropout=0.0 --cell_type --data=/home/gridsan/cloh/spike_data/single_dy016_random_cell_type_normalized_05_12_2023 "
+done
+done
+done
+done
+
+for bs in 512 
+do
+for lr in 0.001 
+do
+for nembd in 32 
+do
+for dim in 5
+do
+python run.py --add_prefix=0514cellgood --submit --arg_str="--out_dim=128 --proj_dim=${dim} --batch-size=${bs} --lr=${lr} --epochs=800 --fp16 --use_gpt --is_causal --n_embd=${nembd} --add_train --dropout=0.0 --cell_type --data=/home/gridsan/cloh/spike_data/single_dy016_cell_type_good_units_05_14_2023 "
+done
+done
+done
+done
+
+python run.py --out_dim=128 --proj_dim=5 --batch-size=512 --lr=0.001 --epochs=800 --fp16 --use_gpt --is_causal --n_embd=32 --add_train --dropout=0.0 --cell_type --data=/home/gridsan/cloh/spike_data/single_dy016_random_cell_type_normalized_05_12_2023 
+
+python run.py --out_dim=128 --proj_dim=5 --batch-size=512 --lr=0.001 --epochs=800 --fp16 --use_gpt --is_causal --n_embd=32 --add_train --dropout=0.0 --cell_type --data=/home/gridsan/cloh/spike_data/single_dy016_cell_type_good_units_05_14_2023
+
+
+python main.py \
+      --data /gpfs/u/home/BNSS/BNSSlhch/scratch/spike_data/multi_dy016_detected_spikes_05_13_2023 \
+             --workers 32\
+                    --epochs 800       \
+                    --batch-size 4       \
+                    --out_dim 5     \
+                    --proj_dim 5      \
+                     --optimizer adam      \
+                      --learning-rate 0.0001    \
+                         --checkpoint-dir /gpfs/u/home/BNSS/BNSSlhch/scratch/spike_contrastive/saved_models/       \
+                         --log-dir /gpfs/u/home/BNSS/BNSSlhch/scratch/spike_contrastive/logs/       \
+                         --ngpus-per-node 4       \
+                         --nodes 4       \
+                         --exp test_detected_concatpos       \
+                         --block_size 1342    \
+                         --n_embd 64       \
+                         --multi_chan       \
+                         --pos_enc conseq      \
+                          --is_causal       \
+                          --num_extra_chans 5       \
+                          --knn-freq 10       \
+                          --add_train \
+                          --detected_spikes \
+                          --no_knn \
+                          --use_chan_pos \
                           --concat_pos

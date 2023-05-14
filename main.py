@@ -22,6 +22,7 @@ from data_aug.contrastive_learning_dataset import ContrastiveLearningDataset, WF
 from models.model_GPT import GPTConfig, Multi_GPT, Projector
 from ddp_utils import knn_monitor
 from data_aug.wf_data_augs import Crop
+from load_models import save_reps
 
 # def main():
 #     args = parser.parse_args()
@@ -212,6 +213,10 @@ def main_worker(gpu, args):
             # save checkpoint to epoch
             if epoch % args.save_freq == 0 and epoch != 0:
                 torch.save(state, args.checkpoint_dir / 'checkpoint_epoch{}.pth'.format(epoch))
+            
+            if epoch % 50 == 0 and not args.no_knn:
+                save_reps(model, memory_loader, args.checkpoint_dir / 'checkpoint.pth', split='train', multi_chan=True, rep_after_proj=False, use_chan_pos=args.use_chan_pos)
+                save_reps(model, test_loader, args.checkpoint_dir / 'checkpoint.pth', split='test', multi_chan=True, rep_after_proj=False, use_chan_pos=args.use_chan_pos)
 
             # log to tensorboard
             logger.log_value('loss', loss.item(), epoch)

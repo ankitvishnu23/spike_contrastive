@@ -5,10 +5,13 @@ from data_aug.wf_data_augs import Crop
 import os
 
 class Encoder(torch.nn.Module):
-    def __init__(self, multi_chan = False, rep_dim=5, proj_dim=5, pos_enc='conseq', rep_after_proj=False, use_chan_pos=False, use_merge_layer=False, add_layernorm=False, half_embed_each=False):
+    def __init__(self, multi_chan = False, rep_dim=5, proj_dim=5, pos_enc='conseq', rep_after_proj=False, use_chan_pos=False, use_merge_layer=False, add_layernorm=False, half_embed_each=False, concat_pos=False):
         super().__init__()
         if multi_chan:
-            model_args = dict(bias=False, block_size=1331, n_layer=20, n_head =4, n_embd=64, dropout=0.2, out_dim=5, proj_dim=5, is_causal=True, pos = pos_enc, multi_chan=True, use_chan_pos=use_chan_pos, use_merge_layer=use_merge_layer, add_layernorm=add_layernorm, half_embed_each=half_embed_each)
+            if concat_pos:
+                model_args = dict(bias=False, block_size=1342, n_layer=20, n_head =4, n_embd=64, dropout=0.2, out_dim=rep_dim, proj_dim=proj_dim, is_causal=True, pos = pos_enc, multi_chan=True, use_chan_pos=use_chan_pos, use_merge_layer=use_merge_layer, add_layernorm=add_layernorm, half_embed_each=half_embed_each, concat_pos=concat_pos)
+            else:    
+                model_args = dict(bias=False, block_size=1331, n_layer=20, n_head =4, n_embd=64, dropout=0.2, out_dim=rep_dim, proj_dim=proj_dim, is_causal=True, pos = pos_enc, multi_chan=True, use_chan_pos=use_chan_pos, use_merge_layer=use_merge_layer, add_layernorm=add_layernorm, half_embed_each=half_embed_each, concat_pos=concat_pos)
         else:
             model_args = dict(bias=False, block_size=121, n_layer=20, n_head =4, n_embd=32, dropout=0.2, out_dim=rep_dim, proj_dim=proj_dim, is_causal=True, pos = pos_enc, multi_chan=False)
         gptconf = GPTConfig(**model_args)
@@ -31,9 +34,9 @@ class Encoder(torch.nn.Module):
             r = self.projector(r)
         return r   
 
-def load_ckpt(ckpt_path, multi_chan=False, rep_dim=5, proj_dim=5, pos_enc='conseq', rep_after_proj=False, use_chan_pos=False, use_merge_layer=False, add_layernorm=False, half_embed_each=False):
+def load_ckpt(ckpt_path, multi_chan=False, rep_dim=5, proj_dim=5, pos_enc='conseq', rep_after_proj=False, use_chan_pos=False, use_merge_layer=False, add_layernorm=False, half_embed_each=False, concat_pos=False):
     ckpt = torch.load(ckpt_path, map_location=torch.device('cpu'))
-    model = Encoder(multi_chan=multi_chan, rep_dim=rep_dim, proj_dim=proj_dim, pos_enc=pos_enc, rep_after_proj=rep_after_proj, use_chan_pos=use_chan_pos, use_merge_layer=use_merge_layer, add_layernorm=add_layernorm, half_embed_each=half_embed_each)
+    model = Encoder(multi_chan=multi_chan, rep_dim=rep_dim, proj_dim=proj_dim, pos_enc=pos_enc, rep_after_proj=rep_after_proj, use_chan_pos=use_chan_pos, use_merge_layer=use_merge_layer, add_layernorm=add_layernorm, half_embed_each=half_embed_each, concat_pos=concat_pos)
     if multi_chan:
         state_dict = {k.replace('module.', ''): v for k, v in ckpt['model'].items()}
         m, uek = model.load_state_dict(state_dict, strict=False)
@@ -72,7 +75,7 @@ def get_dataloader(data_path, multi_chan=False, split='train', use_chan_pos=Fals
     return loader
 
 
-def save_reps(model, loader, ckpt_path, split='train', multi_chan=False,rep_after_proj=False, use_chan_pos=False):
+def save_reps(model, loader, ckpt_path, split='train', multi_chan=False,rep_after_proj=False, use_chan_pos=False, suffix=''):
     ckpt_root_dir = '/'.join(ckpt_path.split('/')[:-1])
     model.eval()
     feature_bank = []
@@ -97,8 +100,8 @@ def save_reps(model, loader, ckpt_path, split='train', multi_chan=False,rep_afte
         feature_bank = torch.cat(feature_bank, dim=0)
         print(feature_bank.shape)
         if rep_after_proj:
-            torch.save(feature_bank, os.path.join(ckpt_root_dir, f'{split}_aftproj_reps.pt'))
-            print(f"saved {split} features to {ckpt_root_dir}/{split}_aftproj_reps.pt")
+            torch.save(feature_bank, os.path.join(ckpt_root_dir, f'{split}_aftproj_reps{suffix}.pt'))
+            print(f"saved {split} features to {ckpt_root_dir}/{split}_aftproj_reps{suffix}.pt")
         else:
-            torch.save(feature_bank, os.path.join(ckpt_root_dir, f'{split}_reps.pt'))
-            print(f"saved {split} features to {ckpt_root_dir}/{split}_reps.pt")
+            torch.save(feature_bank, os.path.join(ckpt_root_dir, f'{split}_reps{suffix}.pt'))
+            print(f"saved {split} features to {ckpt_root_dir}/{split}_reps{suffix}.pt")

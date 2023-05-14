@@ -169,6 +169,11 @@ class WFDataset_lab(Dataset):
     spike_mcs_test_fn = "channel_num_test.npy"
     chan_coords_test_fn = "channel_spike_locs_test.npy"
 
+    val_set_fn = "spikes_val.npy"
+    val_targets_fn = "labels_val.npy"
+    spike_mcs_val_fn = "channel_num_val.npy"
+    chan_coords_val_fn = "channel_spike_locs_val.npy"
+    
     def __init__(
         self,
         root: str,
@@ -191,6 +196,11 @@ class WFDataset_lab(Dataset):
             self.targets = np.load(os.path.join(root, self.test_targets_fn))
             self.chan_nums = np.load(os.path.join(root, self.spike_mcs_test_fn))
             self.channel_locs = np.load(os.path.join(root, self.chan_coords_test_fn))
+        elif split == 'val':
+            self.data = np.load(os.path.join(root, self.val_set_fn)).astype('float32')
+            self.targets = np.load(os.path.join(root, self.val_targets_fn))
+            self.chan_nums = np.load(os.path.join(root, self.spike_mcs_val_fn))
+            self.channel_locs = np.load(os.path.join(root, self.chan_coords_val_fn))
             
         # self.data: Any = []
 
