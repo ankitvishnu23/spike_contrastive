@@ -273,6 +273,22 @@ done
 done
 done
 
+for bs in 512 
+do
+for lr in 0.001 
+do
+for nembd in 32 
+do
+for dim in 5
+do
+python run.py --add_prefix=0513 --submit --arg_str="--out_dim=128 --proj_dim=${dim} --batch-size=${bs} --lr=${lr} --epochs=800 --fp16 --use_gpt --is_causal --n_embd=${nembd} --add_train --cell_type --data=/home/gridsan/evanv/charlotte/spike_data/single_dy016_random_cell_type_normalized_05_12_2023 "
+done
+done
+done
+done
+
+python run.py --out_dim=128 --proj_dim=5 --batch-size=512 --lr=0.001 --epochs=800 --fp16 --use_gpt --is_causal --n_embd=32 --add_train --cell_type --data=/home/gridsan/evanv/charlotte/spike_data/single_dy016_random_cell_type_normalized_05_12_2023 --exp=0513_cell_type
+
 python \
       /gpfs/wscgpfs02/shivsr/cloh/spike_contrastive/main.py \
       --data /gpfs/wscgpfs02/shivsr/cloh/spike_data/multi_dy016_random_neurons_04_28_2023 \
@@ -333,6 +349,31 @@ python knn_eval.py \
     --use_merge_layer \
     --add_layernorm 
 
+
+python main.py \
+      --data /gpfs/u/home/BNSS/BNSSlhch/scratch/spike_data/multi_dy016_random_neurons_04_28_2023 \
+      --workers 32 \
+      --epochs 800 \
+      --batch-size 4 \
+      --out_dim 5 \
+      --proj_dim 5 \
+      --optimizer adam \
+      --learning-rate 0.0001 \
+      --checkpoint-dir /gpfs/u/home/BNSS/BNSSlhch/scratch/spike_contrastive/saved_models/ \
+      --log-dir /gpfs/u/home/BNSS/BNSSlhch/scratch/spike_contrastive/logs/ \
+      --ngpus-per-node 4 \
+      --nodes 4 \
+      --exp test_removepos \
+      --block_size 1331 \
+      --n_embd 64 \
+      --multi_chan \
+      --pos_enc conseq \
+      --is_causal \
+      --num_extra_chans 5 \
+      --knn-freq 10 \
+      --add_train \
+      --remove_pos
+
 python \
       /gpfs/wscgpfs02/shivsr/cloh/spike_contrastive/main.py \
       --data /gpfs/wscgpfs02/shivsr/cloh/spike_data/multi_dy016_detected_spikes_05_13_2023 \
@@ -362,3 +403,20 @@ python wsc_launcher.py --dist-url "tcp://$MASTER_HOSTNAME:10596" --dist-backend 
                 --batch-size 120 --epochs 800 --learning-rate ${lr} --checkpoint-dir /gpfs/wscgpfs02/shivsr/cloh/spike_contrastive/saved_models \
                 --log-dir /gpfs/wscgpfs02/shivsr/cloh/spike_contrastive/logs --exp 0513_mc_conseq_causal_n64_b1331_bs120_extra5_lr${lr}_detected_spikes --detected_spikes --no_knn --n_embd 64 --block_size 1331 --multi_chan --pos_enc conseq --is_causal --num_extra_chans 5 $script "$@"
 
+
+
+python run.py --out_dim=128 --proj_dim=5 --batch-size=512 --lr=0.001 --epochs=800 --fp16 --use_gpt --is_causal --n_embd=32 --add_train --detected_spikes --no_knn --data=/home/gridsan/evanv/charlotte/spike_data/single_dy016_detected_spikes_05_13_2023 --exp=0513_detected
+
+for bs in 512 
+do
+for lr in 0.001 0.0005
+do
+for nembd in 32 
+do
+for dim in 5
+do
+python run.py --add_prefix=0513 --submit --arg_str="--out_dim=128 --proj_dim=${dim} --batch-size=${bs} --lr=${lr} --epochs=800 --fp16 --use_gpt --is_causal --n_embd=${nembd} --add_train --detected_spikes --no_knn --data=/home/gridsan/evanv/charlotte/spike_data/single_dy016_detected_spikes_05_13_2023 "
+done
+done
+done
+done

@@ -118,6 +118,7 @@ class SimCLR(object):
                     chan_pos = torch.cat(chan_pos, dim=0).float()
                 wf = torch.cat(wf, dim=0).float()
                 lab = torch.cat(lab, dim=0).long().cuda(self.gpu,non_blocking=True)
+                
                 # wf = torch.squeeze(wf)
                 # if not self.multichan:
                 #     wf = torch.unsqueeze(wf, dim=1)
@@ -175,7 +176,7 @@ class SimCLR(object):
                 if epoch_counter >= 10 and self.scheduler != None:
                     self.scheduler.step()   
             
-            if epoch_counter % self.args.eval_knn_every_n_epochs == 0 and epoch_counter != 0:
+            if epoch_counter % self.args.eval_knn_every_n_epochs == 0 and epoch_counter != 0 and not self.args.no_knn:
                 if self.args.rank == 0 or not self.args.ddp:
                     # knn_score = validation(self.model, self.args.out_dim, self.args.data, self.gpu)
                     # print(f"loss: {loss}, knn_acc:{knn_score}")

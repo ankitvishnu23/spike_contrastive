@@ -92,7 +92,7 @@ def main_worker(gpu, args):
             num_workers=args.workers, pin_memory=True, drop_last=True)
 
     # define memory and test dataset for knn monitoring
-    if not args.ddp:
+    if not args.ddp and not args.no_knn:
         memory_dataset = WFDataset_lab(args.data, split='train', multi_chan=args.multi_chan)
         memory_loader = torch.utils.data.DataLoader(
             memory_dataset, batch_size=args.batch_size, shuffle=False,
@@ -286,6 +286,7 @@ if __name__ == "__main__":
     parser.add_argument('--use_chan_pos', action='store_true') # default = False
     parser.add_argument('--cell_type', action='store_true') # default = False
     parser.add_argument('--detected_spikes', action='store_true') # default = False
+    parser.add_argument('--no_knn', action='store_true') # default = False
 
     args = parser.parse_args()
     
