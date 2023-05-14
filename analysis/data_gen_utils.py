@@ -443,7 +443,8 @@ def make_dataset(bin_path, spike_index, geom, save_path, geom_dims=(1,2), we=Non
                                                                num_chans_extract)
             spikes_array.append(crop_wf)
             geom_locs_array.append(crop_geom)
-        max_chan_array = mcs
+            max_chan_array.append(crop_chan)
+        # max_chan_array = mcs
     else:
         for k, unit_id in tqdm(enumerate(unit_ids), desc="Unit IDs"):
             curr_temp_wfs = []
