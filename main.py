@@ -291,10 +291,12 @@ class SimCLR(nn.Module):
         loss = infoNCE(z1, z2) / 2 + infoNCE(z2, z1) / 2
         
         logits = self.online_head(r1.detach())
-        cls_loss = torch.nn.functional.cross_entropy(logits, labels)
-        acc = torch.sum(torch.eq(torch.argmax(logits, dim=1), labels)) / logits.size(0)
-
-        loss = loss + cls_loss
+        if not self.args.detected_spikes:
+            cls_loss = torch.nn.functional.cross_entropy(logits, labels)
+            acc = torch.sum(torch.eq(torch.argmax(logits, dim=1), labels)) / logits.size(0)
+            loss = loss + cls_loss
+        else:
+            acc = torch.Tensor([0.])
 
         return loss, acc
 
