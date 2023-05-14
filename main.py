@@ -190,8 +190,8 @@ def main_worker(gpu, args):
             scaler.update()
 
             if step % args.print_freq == 0:
-                if args.ddp:
-                    torch.distributed.reduce(acc.div_(args.world_size), 0)
+                if args.ddp and acc.item() >= 0:
+                        torch.distributed.reduce(acc.div_(args.world_size), 0)
                 if args.rank == 0:
                     print(f'epoch={epoch}, step={step}, loss={loss.item()}, acc={acc.item()}, time={int(time.time() - start_time)}', flush=True)
                     stats = dict(epoch=epoch, step=step, learning_rate=lr,
@@ -296,7 +296,7 @@ class SimCLR(nn.Module):
             acc = torch.sum(torch.eq(torch.argmax(logits, dim=1), labels)) / logits.size(0)
             loss = loss + cls_loss
         else:
-            acc = torch.Tensor([0.])
+            acc = torch.Tensor([-1.])
 
         return loss, acc
 

@@ -256,7 +256,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
     model = SimCLR(args).cuda(gpu)
     model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
-    model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[gpu])
+    model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[gpu],find_unused_parameters=True)
 
     if args.optimizer == 'lars':
         optimizer = LARS(model.parameters(), lr=0, weight_decay=args.weight_decay,
@@ -367,7 +367,8 @@ def main_worker(gpu, ngpus_per_node, args):
             scaler.update()
 
             if step % args.print_freq == 0:
-                torch.distributed.reduce(acc.div_(args.world_size), 0)
+                if acc.item() >= 0:
+                    torch.distributed.reduce(acc.div_(args.world_size), 0)
                 if args.rank == 0:
                     print(f'epoch={epoch}, step={step}, loss={loss.item()}, acc={acc.item()}', flush=True)
                     stats = dict(epoch=epoch, step=step, learning_rate=lr,
