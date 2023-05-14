@@ -61,7 +61,7 @@ class WFDataset(Dataset):
         wf = self.data[index].astype('float32')
         mc = self.max_chans[index]
         if self.detected_spikes:
-            y = -1 # dummy value
+            y = [-1] # dummy value
         else:
             y = self.targets[index].astype('long')
         chan_loc = self.channel_locs[index].astype('float32')
@@ -131,7 +131,7 @@ class WF_MultiChan_Dataset(Dataset):
         """
         wf = self.data[index].astype('float32')
         if self.detected_spikes:
-            y = -1 # dummy value
+            y = [-1] # dummy value
         else:
             y = self.targets[index].astype('long')
         chan_nums = self.chan_nums[index]
