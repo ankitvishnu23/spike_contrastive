@@ -443,7 +443,8 @@ def make_dataset(bin_path, spike_index, geom, save_path, geom_dims=(1,2), we=Non
                                                                num_chans_extract)
             spikes_array.append(crop_wf)
             geom_locs_array.append(crop_geom)
-        max_chan_array = mcs
+            max_chan_array.append(crop_chan)
+        # max_chan_array = mcs
     else:
         for k, unit_id in tqdm(enumerate(unit_ids), desc="Unit IDs"):
             curr_temp_wfs = []
@@ -514,7 +515,7 @@ def make_dataset(bin_path, spike_index, geom, save_path, geom_dims=(1,2), we=Non
     print("making train, val, test splits")
     train_set, val_set, test_set = split_data(spikes_array, train_num, val_num, test_num, num_chans_extract, last_dim=spike_length_samples)
     train_geom_locs, val_geom_locs, test_geom_locs = split_data(geom_locs_array, train_num, val_num, test_num, num_chans_extract, last_dim=geom.shape[1])
-    train_max_chan, val_max_chan, test_max_chan = split_data(max_chan_array, train_num, val_num, test_num, 1, last_dim=1)
+    train_max_chan, val_max_chan, test_max_chan = split_data(max_chan_array, train_num, val_num, test_num, num_chans_extract, last_dim=0)
     
     print("saving final results")
     np.save(os.path.join(save_path, 'spikes_train.npy'), train_set)

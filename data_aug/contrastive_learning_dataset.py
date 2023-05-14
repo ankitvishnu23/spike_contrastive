@@ -17,6 +17,7 @@ class WFDataset(Dataset):
     spike_mcs_fn = "channel_num_train.npy"
     chan_coords_fn = "channel_spike_locs_train.npy"
     targets_fn = "labels_train.npy"
+    # masks_fn = "masks_train.npy"
 
     def __init__(
         self,
@@ -47,6 +48,7 @@ class WFDataset(Dataset):
             self.target_transform = target_transform
         self.channel_locs = np.load(os.path.join(root, self.chan_coords_fn))
         self.use_chan_pos = use_chan_pos
+        # self.masks = np.load(os.path.join(root, self.masks_fn))
 
 
     def __getitem__(self, index: int) -> Any :
