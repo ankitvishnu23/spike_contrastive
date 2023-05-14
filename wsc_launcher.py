@@ -148,6 +148,8 @@ parser.add_argument('--remove_pos', action='store_true') # default = False
 
 parser.add_argument('--p_crop', default=0.5, type=float)
 parser.add_argument('--cell_type', action='store_true') # default = False
+parser.add_argument('--no_knn', action='store_true') # default = False
+parser.add_argument('--detected_spikes', action='store_true') # default = False
 
 # wsc setting
 parser.add_argument('--world-size', default=-1, type=int,
@@ -284,7 +286,7 @@ def main_worker(gpu, ngpus_per_node, args):
     
     num_extra_chans = args.num_extra_chans if args.multi_chan else 0
     ds = ContrastiveLearningDataset(args.data, args.out_dim, multi_chan=args.multi_chan, use_chan_pos=args.use_chan_pos)
-    dataset = ds.get_dataset('wfs', 2, args.noise_scale, num_extra_chans)
+    dataset = ds.get_dataset('wfs', 2, args.noise_scale, num_extra_chans, normalize=args.cell_type, p_crop=args.p_crop, detected_spikes=args.detected_spikes)
   
     sampler = torch.utils.data.distributed.DistributedSampler(dataset, drop_last=True)
     assert args.batch_size % args.world_size == 0
@@ -293,7 +295,7 @@ def main_worker(gpu, ngpus_per_node, args):
         dataset, batch_size=per_device_batch_size, num_workers=args.workers,
         pin_memory=True, sampler=sampler)
     
-    if args.rank == 0:
+    if args.rank == 0 and not args.no_knn:
         if args.multi_chan:
             memory_dataset = WFDataset_lab(args.data, split='train', multi_chan=args.multi_chan, transform=Crop(prob=0.0, num_extra_chans=num_extra_chans, ignore_chan_num=True), use_chan_pos=args.use_chan_pos)
             memory_loader = torch.utils.data.DataLoader(
@@ -392,7 +394,7 @@ def main_worker(gpu, ngpus_per_node, args):
             logger.log_value('acc', acc.item(), epoch)
             logger.log_value('learning_rate', lr, epoch)
 
-            if epoch % args.knn_freq == 0:
+            if epoch % args.knn_freq == 0  and not args.no_knn:
                 knn_score = knn_monitor(net=model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True, args=args)
                 print(f"Epoch {epoch}, my knn_acc:{knn_score}")  
                 logger.log_value('knn_acc', knn_score, epoch)

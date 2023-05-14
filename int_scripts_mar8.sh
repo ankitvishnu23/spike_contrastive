@@ -332,3 +332,33 @@ python knn_eval.py \
     --use_chan_pos \
     --use_merge_layer \
     --add_layernorm 
+
+python \
+      /gpfs/wscgpfs02/shivsr/cloh/spike_contrastive/main.py \
+      --data /gpfs/wscgpfs02/shivsr/cloh/spike_data/multi_dy016_detected_spikes_05_13_2023 \
+      --workers 32 \
+      --epochs 100 \
+      --batch-size 4 \
+      --out_dim 5 \
+      --proj_dim 5 \
+      --optimizer adam \
+      --learning-rate 0.001 \
+      --checkpoint-dir /gpfs/wscgpfs02/shivsr/cloh/spike_contrastive/saved_models/ \
+      --log-dir /gpfs/wscgpfs02/shivsr/cloh/spike_contrastive/logs/ \
+      --exp test_mearec \
+      --block_size 1331 \
+      --n_embd 64 \
+      --multi_chan \
+      --pos_enc conseq \
+      --is_causal \
+      --num_extra_chans 5 \
+      --knn-freq 10 \
+      --add_train \
+      --detected_spikes \
+      --no_knn 
+
+python wsc_launcher.py --dist-url "tcp://$MASTER_HOSTNAME:10596" --dist-backend 'nccl' --multiprocessing-distributed \
+                --world-size $NODES --rank ${PMIX_RANK} --data /gpfs/wscgpfs02/shivsr/cloh/spike_data/multi_dy016_detected_spikes_05_13_2023 --workers 32 \
+                --batch-size 120 --epochs 800 --learning-rate ${lr} --checkpoint-dir /gpfs/wscgpfs02/shivsr/cloh/spike_contrastive/saved_models \
+                --log-dir /gpfs/wscgpfs02/shivsr/cloh/spike_contrastive/logs --exp 0513_mc_conseq_causal_n64_b1331_bs120_extra5_lr${lr}_detected_spikes --detected_spikes --no_knn --n_embd 64 --block_size 1331 --multi_chan --pos_enc conseq --is_causal --num_extra_chans 5 $script "$@"
+
