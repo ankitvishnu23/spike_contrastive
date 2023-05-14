@@ -73,7 +73,7 @@ def main_worker(gpu, args):
     
     dataset = ContrastiveLearningDataset(args.data, args.out_dim, multi_chan=args.multi_chan)
 
-    train_dataset = dataset.get_dataset(args.dataset_name, args.n_views, args.noise_scale, num_extra_chans, normalize=args.cell_type)
+    train_dataset = dataset.get_dataset(args.dataset_name, args.n_views, args.noise_scale, num_extra_chans, normalize=args.cell_type, detected_spikes=args.detected_spikes)
     print("ddp:", args.ddp)
     
     if args.ddp:
@@ -285,6 +285,7 @@ if __name__ == "__main__":
     parser.add_argument('--add_train', action='store_true') # default = False
     parser.add_argument('--use_chan_pos', action='store_true') # default = False
     parser.add_argument('--cell_type', action='store_true') # default = False
+    parser.add_argument('--detected_spikes', action='store_true') # default = False
 
     args = parser.parse_args()
     

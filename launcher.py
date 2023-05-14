@@ -114,6 +114,8 @@ parser.add_argument('--half_embed_each', action='store_true') # default = False
 parser.add_argument('--remove_pos', action='store_true') # default = False
 parser.add_argument('--p_crop', default=0.5, type=float)
 parser.add_argument('--cell_type', action='store_true') # default = False
+parser.add_argument('--no_knn', action='store_true') # default = False
+parser.add_argument('--detected_spikes', action='store_true') # default = False
 
 class Trainer(object):
     def __init__(self, args):

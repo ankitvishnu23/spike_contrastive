@@ -17,6 +17,7 @@ class WFDataset(Dataset):
     spike_mcs_fn = "channel_num_train.npy"
     chan_coords_fn = "channel_spike_locs_train.npy"
     targets_fn = "labels_train.npy"
+    # masks_fn = "masks_train.npy"
 
     def __init__(
         self,
@@ -24,6 +25,7 @@ class WFDataset(Dataset):
         use_chan_pos: bool = False, 
         transform: Optional[Callable] = None,
         target_transform: Optional[Callable] = None,
+        detected_spikes: bool = False
     ) -> None:
 
         super().__init__()
@@ -36,10 +38,17 @@ class WFDataset(Dataset):
         self.root = root
         self.max_chans = np.load(os.path.join(root, self.spike_mcs_fn))
         self.transform = transform
-        self.targets = np.load(os.path.join(root, self.targets_fn))
-        self.target_transform = target_transform
+        self.detected_spikes = detected_spikes
+
+        if detected_spikes:
+            self.targets = None
+            self.target_transform = None
+        else:
+            self.targets = np.load(os.path.join(root, self.targets_fn))
+            self.target_transform = target_transform
         self.channel_locs = np.load(os.path.join(root, self.chan_coords_fn))
         self.use_chan_pos = use_chan_pos
+        # self.masks = np.load(os.path.join(root, self.masks_fn))
 
 
     def __getitem__(self, index: int) -> Any :
@@ -51,7 +60,10 @@ class WFDataset(Dataset):
         """
         wf = self.data[index].astype('float32')
         mc = self.max_chans[index]
-        y = self.targets[index].astype('long')
+        if self.detected_spikes:
+            y = -1 # dummy value
+        else:
+            y = self.targets[index].astype('long')
         chan_loc = self.channel_locs[index].astype('float32')
 
         if self.transform is not None and self.use_chan_pos:
@@ -83,7 +95,8 @@ class WF_MultiChan_Dataset(Dataset):
         root: str,
         use_chan_pos: bool = False, 
         transform: Optional[Callable] = None,
-        target_transform: Optional[Callable] = None
+        target_transform: Optional[Callable] = None,
+        detected_spikes: bool = False
     ) -> None:
 
         super().__init__()
@@ -96,10 +109,18 @@ class WF_MultiChan_Dataset(Dataset):
         self.root = root
         self.chan_nums = np.load(os.path.join(root, self.spike_mcs_fn))
         self.transform = transform
-        self.targets = np.load(os.path.join(root, self.targets_fn))
-        self.target_transform = target_transform
+        self.detected_spikes = detected_spikes
+
+        if detected_spikes:
+            self.targets = None
+            self.target_transform = None
+        else:
+            self.targets = np.load(os.path.join(root, self.targets_fn))
+            self.target_transform = target_transform
         self.channel_locs = np.load(os.path.join(root, self.chan_coords_fn))
         self.use_chan_pos = use_chan_pos
+        print(len(self.chan_nums))
+        print(self.chan_nums.shape)
 
     def __getitem__(self, index: int) -> Any :
         """
@@ -109,7 +130,10 @@ class WF_MultiChan_Dataset(Dataset):
             tensor: wf
         """
         wf = self.data[index].astype('float32')
-        y = self.targets[index].astype('long')
+        if self.detected_spikes:
+            y = -1 # dummy value
+        else:
+            y = self.targets[index].astype('long')
         chan_nums = self.chan_nums[index]
         chan_loc = self.channel_locs[index].astype('float32')
 
@@ -123,7 +147,7 @@ class WF_MultiChan_Dataset(Dataset):
 
         if self.target_transform is not None:
             y = self.target_transform(y)
-
+        
         if self.use_chan_pos:
             return [wf, chan_loc], y
             
@@ -247,7 +271,7 @@ class ContrastiveLearningDataset:
         
         return data_transforms
 
-    def get_dataset(self, name, n_views, noise_scale=1.0, num_extra_chans=0, normalize=False, p_crop=0.5):
+    def get_dataset(self, name, n_views, noise_scale=1.0, num_extra_chans=0, normalize=False, p_crop=0.5, detected_spikes=False):
         temp_cov_fn = 'temporal_cov_example.npy'    
         spatial_cov_fn = 'spatial_cov_example.npy'
         if self.multi_chan:
@@ -259,7 +283,8 @@ class ContrastiveLearningDataset:
                                                                 #   noise_scale), self.get_pca_transform(self),
                                                                   noise_scale, 0, normalize), None,
                                                                   n_views),
-                                                                  target_transform=LabelViewGenerator()),
+                                                                  target_transform=LabelViewGenerator(),
+                                                                  detected_spikes=detected_spikes),
                           'wfs_multichan': lambda: WF_MultiChan_Dataset(self.root_folder, use_chan_pos=self.use_chan_pos,
                                                               transform=ContrastiveLearningViewGenerator(
                                                                   self.get_wf_pipeline_transform(self, temp_cov_fn,
@@ -267,7 +292,8 @@ class ContrastiveLearningDataset:
                                                                 #   noise_scale), self.get_pca_transform(self),
                                                                   noise_scale, num_extra_chans, p_crop=p_crop), None,
                                                                   n_views),
-                                                                  target_transform=LabelViewGenerator()),
+                                                                  target_transform=LabelViewGenerator(),
+                                                                  detected_spikes=detected_spikes),
                           'cifar10': lambda: datasets.CIFAR10(self.root_folder, train=True,
                                                               transform=ContrastiveLearningViewGenerator(
                                                                   self.get_simclr_pipeline_transform(32),
