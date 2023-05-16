@@ -398,6 +398,18 @@ def extract_sim(rec_path, wfs_per_unit, use_labels=True, geom_dims=(1,2), trough
     return spike_index.T, geom, we
 
 
+def chunk_data(spike_index, max_proc_len=25000):
+    spike_idx_len = len(spike_index)
+    n_chunks = spike_idx_len // max_proc_len + 1
+    chunks = []
+    for i in range(n_chunks):
+        start = i * max_proc_len
+        chunk = spike_index[start:start+max_proc_len]
+        chunks.append(chunk)
+    
+    return chunks
+
+
 def make_dataset(bin_path, spike_index, geom, save_path, geom_dims=(1,2), we=None, templates=None,
                  num_chans_extract=21, channel_index=None, unit_ids=None, train_num=1200, val_num=100, test_num=200, 
                  trough_offset=42, spike_length_samples=121, plot=False):
@@ -405,6 +417,7 @@ def make_dataset(bin_path, spike_index, geom, save_path, geom_dims=(1,2), we=Non
     spikes_array = []
     geom_locs_array = []
     max_chan_array = []
+    max_proc_len = 25000
     num_template_amps_shift = 4
     num_chans = math.floor(num_chans_extract/2)
     tot_num_chans = geom.shape[0]
@@ -429,21 +442,27 @@ def make_dataset(bin_path, spike_index, geom, save_path, geom_dims=(1,2), we=Non
             print("no unit ids, skipping plotting...")
     
     if unit_ids is None:
-        print("reading waveforms")
-        waveforms, _ = read_waveforms(spike_index[:, 0], bin_path, 
-                                      n_channels=geom.shape[0], spike_length_samples=spike_length_samples)
-        mcs = spike_index[:, 1]
-        print("cropping and storing waveforms")
-        for i, waveform in enumerate(waveforms):
-            mc_curr = mcs[i]
-            mc_start = max(mc_curr - num_chans, 0)
-            mc_end = min(mc_curr + num_chans, tot_num_chans - 1) + 1
-            crop_wf, crop_chan, crop_geom, mask = pad_channels(waveform.T[mc_start:mc_end], 
-                                                               geom[mc_start:mc_end, geom_dims], mc_start, mc_end, 
-                                                               num_chans_extract)
-            spikes_array.append(crop_wf)
-            geom_locs_array.append(crop_geom)
-            max_chan_array.append(crop_chan)
+        print("chunking data")
+        data_chunks = chunk_data(spike_index, max_proc_len)
+        for i in range(len(data_chunks)):
+            curr_chunk = data_chunks[i]
+            if i == 0:
+                print("reading waveforms")
+            waveforms, _ = read_waveforms(curr_chunk, bin_path, 
+                                      n_channels=geom.shape[0], spike_length_samples=121)
+            mcs = curr_chunk[:, 1]
+            if i == 0:
+                print("cropping and storing waveforms")
+            for i, waveform in enumerate(waveforms):
+                mc_curr = mcs[i]
+                mc_start = max(mc_curr - num_chans, 0)
+                mc_end = min(mc_curr + num_chans, tot_num_chans) + 1
+                crop_wf, crop_chan, crop_geom, mask = pad_channels(waveform.T[mc_start:mc_end], 
+                                                                   geom[mc_start:mc_end, 1:], mc_start, mc_end, 
+                                                                   num_chans_extract)
+                spikes_array.append(crop_wf)
+                geom_locs_array.append(crop_geom)
+                max_chan_array.append(crop_chan)
         # max_chan_array = mcs
     else:
         for k, unit_id in tqdm(enumerate(unit_ids), desc="Unit IDs"):
