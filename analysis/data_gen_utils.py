@@ -411,8 +411,8 @@ def chunk_data(spike_index, max_proc_len=25000):
 
 
 def make_dataset(bin_path, spike_index, geom, save_path, geom_dims=(1,2), we=None, templates=None,
-                 num_chans_extract=21, channel_index=None, unit_ids=None, train_num=1200, val_num=100, test_num=200, 
-                 trough_offset=42, spike_length_samples=121, plot=False):
+                 num_chans_extract=21, channel_index=None, unit_ids=None, train_num=1200, val_num=100,
+                 test_num=200, trough_offset=42, spike_length_samples=121, do_split=True, plot=False):
     num_waveforms = train_num + val_num + test_num
     spikes_array = []
     geom_locs_array = []
@@ -532,25 +532,40 @@ def make_dataset(bin_path, spike_index, geom, save_path, geom_dims=(1,2), we=Non
     np.save(os.path.join(save_path, 'channel_spike_locs.npy'), geom_locs_array)
     
     print("making train, val, test splits")
-    train_set, val_set, test_set = split_data(spikes_array, train_num, val_num, test_num, num_chans_extract, last_dim=spike_length_samples)
-    train_geom_locs, val_geom_locs, test_geom_locs = split_data(geom_locs_array, train_num, val_num, test_num, num_chans_extract, last_dim=geom.shape[1])
-    train_max_chan, val_max_chan, test_max_chan = split_data(max_chan_array, train_num, val_num, test_num, num_chans_extract, last_dim=0)
+    if do_split:
+        train_set, val_set, test_set = split_data(spikes_array, train_num, val_num, test_num, 
+                                                  num_chans_extract, last_dim=spike_length_samples)
+        train_geom_locs, val_geom_locs, test_geom_locs = split_data(geom_locs_array, train_num, val_num, 
+                                                                    test_num, num_chans_extract,
+                                                                    last_dim=geom.shape[1])
+        train_max_chan, val_max_chan, test_max_chan = split_data(max_chan_array, train_num, val_num, 
+                                                                 test_num, num_chans_extract, last_dim=0)
+        print("saving split results")
+        np.save(os.path.join(save_path, 'spikes_train.npy'), train_set)
+        np.save(os.path.join(save_path, 'spikes_val.npy'), val_set)
+        np.save(os.path.join(save_path, 'spikes_test.npy'), test_set)
+
+        np.save(os.path.join(save_path, 'channel_spike_locs_train.npy'), train_geom_locs)
+        np.save(os.path.join(save_path, 'channel_spike_locs_val.npy'), val_geom_locs)
+        np.save(os.path.join(save_path, 'channel_spike_locs_test.npy'), test_geom_locs)
+
+        np.save(os.path.join(save_path, 'channel_num_train.npy'), train_max_chan)
+        np.save(os.path.join(save_path, 'channel_num_val.npy'), val_max_chan)
+        np.save(os.path.join(save_path, 'channel_num_test.npy'), test_max_chan)
+        
+        np.save(os.path.join(save_path, 'geom.npy'), geom)
+        
+        return train_set, val_set, test_set, train_geom_locs, val_geom_locs, test_geom_locs, train_max_chan, val_max_chan, test_max_chan
+        
+    else:
+        #save out full dataset with no splits (useful for inference)
+        print("saving no split results")
+        np.save(os.path.join(save_path, 'spikes_test.npy'), spikes_array)
+        np.save(os.path.join(save_path, 'channel_spike_locs_test.npy'), geom_locs_array)
+        np.save(os.path.join(save_path, 'channel_num_test.npy'), max_chan_array)
     
-    print("saving final results")
-    np.save(os.path.join(save_path, 'spikes_train.npy'), train_set)
-    np.save(os.path.join(save_path, 'spikes_val.npy'), val_set)
-    np.save(os.path.join(save_path, 'spikes_test.npy'), test_set)
-            
-    np.save(os.path.join(save_path, 'channel_spike_locs_train.npy'), train_geom_locs)
-    np.save(os.path.join(save_path, 'channel_spike_locs_val.npy'), val_geom_locs)
-    np.save(os.path.join(save_path, 'channel_spike_locs_test.npy'), test_geom_locs)
-    
-    np.save(os.path.join(save_path, 'channel_num_train.npy'), train_max_chan[0])
-    np.save(os.path.join(save_path, 'channel_num_val.npy'), val_max_chan[0])
-    np.save(os.path.join(save_path, 'channel_num_test.npy'), test_max_chan[0])
-    
-    np.save(os.path.join(save_path, 'geom.npy'), geom)
-    
-    return train_set, val_set, test_set, train_geom_locs, val_geom_locs, test_geom_locs, train_max_chan, val_max_chan, test_max_chan
+        np.save(os.path.join(save_path, 'geom.npy'), geom)
+        
+        return spikes_array, geom_locs_array, max_chan_array
     
     

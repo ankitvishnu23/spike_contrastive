@@ -514,7 +514,7 @@ def plot_gmm(gmm, X, label=True, ax=None):
         ax.scatter(X[:, 0], X[:, 1], c=labels, s=40, cmap='gist_rainbow', zorder=2, alpha=.2)
     else:
         ax.scatter(X[:, 0], X[:, 1], s=40, zorder=2, alpha=.2)
-    ax.axis('equal')
+    # ax.axis('equal')
     
     w_factor = .2
     for pos, covar, w in zip(gmm.means_, gmm.covariances_, gmm.weights_):

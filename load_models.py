@@ -13,7 +13,7 @@ class Encoder(torch.nn.Module):
             else:    
                 model_args = dict(bias=False, block_size=1331, n_layer=20, n_head =4, n_embd=64, dropout=0.2, out_dim=rep_dim, proj_dim=proj_dim, is_causal=True, pos = pos_enc, multi_chan=True, use_chan_pos=use_chan_pos, use_merge_layer=use_merge_layer, add_layernorm=add_layernorm, half_embed_each=half_embed_each, concat_pos=concat_pos)
         else:
-            model_args = dict(bias=False, block_size=121, n_layer=20, n_head =4, n_embd=32, dropout=0.2, out_dim=rep_dim, proj_dim=proj_dim, is_causal=True, pos = pos_enc, multi_chan=False)
+            model_args = dict(bias=False, block_size=121, n_layer=20, n_head =4, n_embd=32, dropout=0.0, out_dim=rep_dim, proj_dim=proj_dim, is_causal=True, pos = pos_enc, multi_chan=False)
         gptconf = GPTConfig(**model_args)
         if multi_chan:
             self.backbone = Multi_GPT(gptconf)

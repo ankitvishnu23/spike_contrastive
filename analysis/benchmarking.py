@@ -87,6 +87,8 @@ def train(data, labels, layers=[1000, 50, 10], epochs=25):
     return mlp
 
 def class_scores(train_reps, test_reps, num_classes, layers=[1000, 100, 10], epochs=100, mod_type='mlp', wf_ids=None, model_params={}):
+    if wf_ids is None:
+        wf_ids = list(range(num_classes))
     layers = [1000, 100, num_classes]
     labels_train = np.array([[i for j in range(1200)] for i in range(num_classes)]).reshape(-1)
     labels_test = np.array([[i for j in range(300)] for i in range(num_classes)]).reshape(-1)
@@ -96,9 +98,9 @@ def class_scores(train_reps, test_reps, num_classes, layers=[1000, 100, 10], epo
     if mod_type == 'mlp':
         mlp = train(train_reps, labels_train, layers, epochs=epochs)
     elif mod_type == 'gmm':
-        pred_labels = GMM(train_reps, test_reps, model_params)
+        pred_labels = GMM(train_reps, test_reps)
     elif mod_type == 'hdbscan':
-        pred_labels = HDBSCAN(test_reps, model_params)
+        pred_labels = HDBSCAN(test_reps)
     per_class_acc = {}
     for i in range(num_classes):
         # class_score = knn.score(test_reps[300*i:300*(i+1)], labels_test[300*i:300*(i+1)])*100
@@ -112,10 +114,10 @@ def class_scores(train_reps, test_reps, num_classes, layers=[1000, 100, 10], epo
         per_class_acc['wf {}'.format(str(wf_ids[i]))] = class_score
     return per_class_acc
         
-def avg_score(train_reps, test_reps, num_classes, layers=[1000, 100, 10], epochs=100, mod_type='mlp', ret_pred_labels=False, model_params={}):
+def avg_score(train_reps, test_reps, num_classes, labels_train, labels_test, layers=[1000, 100, 10], epochs=100, mod_type='mlp', ret_pred_labels=False, model_params={}):
     layers = [1000, 100, num_classes]
-    labels_train = np.array([[i for j in range(1200)] for i in range(num_classes)]).reshape(-1)
-    labels_test = np.array([[i for j in range(300)] for i in range(num_classes)]).reshape(-1)
+    # labels_train = np.array([[i for j in range(1200)] for i in range(num_classes)]).reshape(-1)
+    # labels_test = np.array([[i for j in range(300)] for i in range(num_classes)]).reshape(-1)
     
     # knn = KNeighborsClassifier(n_neighbors = 10)
     # knn.fit(train_reps, labels_train)
@@ -129,29 +131,33 @@ def avg_score(train_reps, test_reps, num_classes, layers=[1000, 100, 10], epochs
         acc['score'] = accuracy_score(pred_labels, labels_test)*100
     elif mod_type == 'gmm':
         # pred_labels = GMM(train_reps, test_reps, num_classes)
-        pred_labels = GMM(train_reps, test_reps, model_params)
+        if model_params['n_clusters'] is None:
+            model_params['n_clusters'] = num_classes
+        pred_labels, bic_scores_test, bic_scores_train = GMM(train_reps, test_reps, n_clusters=model_params['n_clusters'])
         acc = {}
         acc['score'] = adjusted_rand_score(labels_test, pred_labels)*100
+        acc['bic_test'] = bic_scores_test
+        acc['bic_train'] = bic_scores_train
     elif mod_type == 'hdbscan':
-        pred_labels = HDBSCAN(test_reps, model_params)
+        pred_labels = HDBSCAN(test_reps)
         acc = {}
         acc['score'] = adjusted_rand_score(labels_test, pred_labels)*100
     if ret_pred_labels:
         return acc, pred_labels
     return acc
 
-def per_class_accs(train_reps, test_reps, models, num_classes, mod_type='mlp', wf_ids=None, model_params={}):
+def per_class_accs(train_reps, test_reps, models, num_classes, labels_train, labels_test, mod_type='mlp', wf_ids=None, model_params={}):
     class_res = {}
 
     for i in range(len(train_reps)):
-        class_res[models[i]] = class_scores(train_reps[i], test_reps[i], num_classes, mod_type=mod_type, wf_ids=wf_ids, model_params=model_params)
+        class_res[models[i]] = class_scores(train_reps[i], test_reps[i], num_classes, labels_train, labels_test, mod_type=mod_type, wf_ids=wf_ids, model_params=model_params)
         
     return class_res
 
-def avg_class_accs(train_reps, test_reps, models, num_classes, mod_type='mlp', model_params={}):
+def avg_class_accs(train_reps, test_reps, models, num_classes, labels_train, labels_test, mod_type='mlp', model_params={}):
     class_res = {}
 
     for i in range(len(train_reps)):
-        class_res[models[i]] = avg_score(train_reps[i], test_reps[i], num_classes, mod_type=mod_type, model_params=model_params)
+        class_res[models[i]] = avg_score(train_reps[i], test_reps[i], num_classes, labels_train, labels_test,mod_type=mod_type, model_params=model_params)
         
     return class_res

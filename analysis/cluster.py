@@ -1,16 +1,37 @@
 from sklearn.mixture import GaussianMixture
 import hdbscan
 import numpy as np
+from sklearn.cluster import KMeans
 
-def GMM(train_reps, test_reps, model_params, random_state=0):
-    gm = GaussianMixture(model_params['n_clusters'], random_state=random_state).fit(train_reps)
-    test_labels = gm.predict(test_reps)
+def KMeansClustering(train_reps, test_reps, n_clusters=10, random_state=0):
+    kmeans = KMeans(n_clusters=n_clusters, random_state=random_state).fit(train_reps)
+    test_labels = kmeans.predict(test_reps)
     return test_labels
 
-def HDBSCAN(test_reps, model_params):
-    clusterer = hdbscan.HDBSCAN(min_cluster_size=model_params['min_cluster_size'])
+def GMM(train_reps, test_reps, n_clusters=10, random_state=0):
+    test_labels = []
+    bic_scores_train = []
+    bic_scores_test = []
+    gmm = GaussianMixture(n_clusters, random_state=random_state).fit(train_reps)
+    test_labels = gmm.predict(test_reps)
+    bic_scores_test = gmm.bic(test_reps)
+    bic_scores_train = gmm.bic(train_reps)
+    return test_labels, bic_scores_test, bic_scores_train
+
+def HDBSCAN(test_reps, min_samples=20, min_cluster_size=20):
+    clusterer = hdbscan.HDBSCAN(min_samples=min_samples, min_cluster_size=min_cluster_size)
     clusterer.fit(test_reps)
     return clusterer.labels_
+
+def HDBSCAN_assign_outliers(data, min_samples=20, min_cluster_size=20):
+    clusterer = hdbscan.HDBSCAN(min_samples=min_samples, min_cluster_size=min_cluster_size, prediction_data=True)
+    labels = clusterer.fit_predict(data)
+    outlier_indices = np.where(labels == -1)[0]
+    outlier_scores = clusterer.outlier_scores_
+    for outlier_index in outlier_indices:
+        closest_cluster = np.argmax(outlier_scores[outlier_index])
+        labels[outlier_index] = closest_cluster
+    return labels
 
 
 """Mean shift clustering algorithm.
