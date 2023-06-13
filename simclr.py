@@ -16,7 +16,7 @@ from utils import (
     save_checkpoint, knn_pca_score, 
     gather_from_all
 )
-from ddp_utils import knn_monitor
+from ddp_utils import knn_monitor, gmm_monitor
 import tensorboard_logger as tb_logger
 torch.manual_seed(0)
 import time
@@ -180,9 +180,12 @@ class SimCLR(object):
                 if self.args.rank == 0 or not self.args.ddp:
                     # knn_score = validation(self.model, self.args.out_dim, self.args.data, self.gpu)
                     # print(f"loss: {loss}, knn_acc:{knn_score}")
-                    knn_score = knn_monitor(net=self.model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True, args=self.args)
-                    print(f"loss: {loss}, my knn_acc:{knn_score}")
-                    self.logger.log_value('knn_score', knn_score, epoch_counter)
+                    knn_score = knn_monitor(net=self.model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True, args=args)
+                    gmm_score = gmm_monitor(net=self.model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda', hide_progress=True, args=args)
+                    print(f"Epoch {epoch_counter}, my knn_acc:{knn_score}")
+                    print(f"Epoch {epoch_counter}, my gmm_acc:{gmm_score}")
+                    self.logger.log_value('knn_acc', knn_score, epoch_counter)
+                    self.logger.log_value('gmm_acc', gmm_score, epoch_counter)
                     
             if self.args.rank == 0 or not self.args.ddp:
                 logging.debug(f"Epoch: {epoch_counter}\tLoss: {loss}")

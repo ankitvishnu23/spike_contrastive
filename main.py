@@ -20,7 +20,7 @@ from ddp_utils import gather_from_all
 
 from data_aug.contrastive_learning_dataset import ContrastiveLearningDataset, WFDataset_lab
 from models.model_GPT import GPTConfig, Multi_GPT, Projector
-from ddp_utils import knn_monitor
+from ddp_utils import knn_monitor, gmm_monitor
 from data_aug.wf_data_augs import Crop
 from load_models import save_reps
 
@@ -225,8 +225,11 @@ def main_worker(gpu, args):
             
             if epoch % args.knn_freq == 0  and not args.no_knn:
                 knn_score = knn_monitor(net=model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True, args=args)
-                print(f"Epoch {epoch}, my knn_acc:{knn_score}")  
+                gmm_score = gmm_monitor(net=model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda', hide_progress=True, args=args)
+                print(f"Epoch {epoch}, my knn_acc:{knn_score}")
+                print(f"Epoch {epoch}, my gmm_acc:{gmm_score}")
                 logger.log_value('knn_acc', knn_score, epoch)
+                logger.log_value('gmm_acc', gmm_score, epoch)
 
 
     if args.rank == 0:
