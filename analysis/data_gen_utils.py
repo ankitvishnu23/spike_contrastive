@@ -361,7 +361,7 @@ def extract_IBL(bin_fp, meta_fp, pid, t_window, use_labels=True, sampling_freque
     return spike_index, geom, channel_index, templates
     
     
-def extract_sim(rec_path, wfs_per_unit, use_labels=True, geom_dims=(1,2), trough_offset=42, spike_length_samples=121):
+def extract_sim(rec_path, wfs_per_unit, use_labels=True, geom_dims=(1,2), trough_offset=42, spike_length_samples=131, random_seed=0):
     recgen = mr.load_recordings(rec_path, load_waveforms=False)
     # recgen.extract_templates(cut_out=[1.9,1.91], recompute=True)
     geom_original = recgen.channel_positions[()]
@@ -374,7 +374,7 @@ def extract_sim(rec_path, wfs_per_unit, use_labels=True, geom_dims=(1,2), trough
     rec = si.common_reference(rec, reference='global', operator='median')
     rec = si.zscore(rec)
     
-    pre_peak = trough_offset
+    pre_peak = trough_offset+5
     post_peak = spike_length_samples - pre_peak
 
     folder = 'waveform_folder'
@@ -386,6 +386,7 @@ def extract_sim(rec_path, wfs_per_unit, use_labels=True, geom_dims=(1,2), trough
         ms_after=(1/rec.sampling_frequency)*post_peak*1000,
         max_spikes_per_unit=wfs_per_unit,
         overwrite=True,
+        seed=random_seed
     )
     templates = we.get_all_templates()
     templates = templates[:, :, depth_order]
@@ -412,7 +413,8 @@ def chunk_data(spike_index, max_proc_len=25000):
 
 def make_dataset(bin_path, spike_index, geom, save_path, geom_dims=(1,2), we=None, templates=None,
                  num_chans_extract=21, channel_index=None, unit_ids=None, train_num=1200, val_num=100,
-                 test_num=200, trough_offset=42, spike_length_samples=121, do_split=True, plot=False):
+                 test_num=200, trough_offset=42, spike_length_samples=121, do_split=True, plot=False, random_seed=0):
+    np.random.seed(random_seed)
     num_waveforms = train_num + val_num + test_num
     spikes_array = []
     geom_locs_array = []
