@@ -209,6 +209,7 @@ class WFDataset_lab(Dataset):
         self.root = root
         self.transform = transform
         self.use_chan_pos = use_chan_pos
+        self.num_classes = len(np.unique(self.targets))
 
     def __getitem__(self, index: int) -> Any :
         """

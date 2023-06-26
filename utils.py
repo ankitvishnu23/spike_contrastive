@@ -155,21 +155,30 @@ def get_contr_representations(model, data_set, device):
 
 def get_torch_reps(net, data_loader, device, args):
     feature_bank = []
-    feature_labels = []
+    feature_labels = torch.tensor([])
     with torch.no_grad():
         # generate feature bank
         for data, target in data_loader:
-            if args.use_gpt:
-                feature = net(data.to(device=device, non_blocking=True).unsqueeze(dim=-1))
+            if args.use_chan_pos:
+                data, chan_pos = data
             else:
-                feature = net(data.to(device=device, non_blocking=True).unsqueeze(dim=1))
+                chan_pos = None
+                
+            if args.use_gpt:
+                data = data.view(-1, (args.num_extra_chans*2+1)*121) if args.multi_chan else torch.squeeze(data, dim=1)
+                if args.use_chan_pos:
+                    feature = net(data.to(device=device, non_blocking=True).unsqueeze(dim=-1), chan_pos=chan_pos.to(device=device, non_blocking=True))
+                else:
+                    feature = net(data.to(device=device, non_blocking=True).unsqueeze(dim=-1))
+            else:
+                feature = net(data.to(device=device, non_blocking=True))
             feature = F.normalize(feature, dim=1)
             feature_bank.append(feature)
-            feature_labels.append(target)
+            feature_labels = torch.cat((feature_labels, target))
         # [D, N]
-        feature_bank = torch.cat(feature_bank, dim=0).contiguous()
+        feature_bank = torch.cat(feature_bank, dim=0).cpu().numpy()
         # [N]
-        feature_labels = torch.cat(torch.tensor(feature_labels, device=feature_bank.device), dim=0)
+        feature_labels = feature_labels.cpu().numpy()
     
     return feature_bank, feature_labels
 
@@ -230,6 +239,28 @@ def validation(model, latent_dim, root_path, device):
     print("latent dim: {} - Contrastive reps classifier accuracy: {:.2f}%".format(latent_dim, contr_score) )
     
     return contr_score
+
+
+# GMM fitting to data for validation
+def gmm_monitor(net, memory_data_loader, test_data_loader, device='cuda', hide_progress=False,
+                targets=None, args=None):
+    if not targets:
+        targets = memory_data_loader.dataset.targets
+
+    net.eval()
+    classes = test_data_loader.dataset.num_classes
+
+    # covariance_type : {'full', 'tied', 'diag', 'spherical'}
+    covariance_type = 'full'
+    reps_train, labels_train = get_torch_reps(net, memory_data_loader, device, args)
+    reps_test, labels_test = get_torch_reps(net, test_data_loader, device, args)
+    gmm = GaussianMixture(classes, 
+                        random_state=0, 
+                        covariance_type=covariance_type).fit(reps_train)
+    gmm_cont_test_labels = gmm.predict(reps_test)
+    score = adjusted_rand_score(labels_test, gmm_cont_test_labels)*100
+
+    return score
 
 
 # knn monitor as in InstDisc https://arxiv.org/abs/1805.01978
@@ -293,28 +324,6 @@ def knn_monitor(net, memory_data_loader, test_data_loader, device='cuda', k=200,
             total_num += data.size(0)
             total_top1 += (pred_labels[:, 0] == target).float().sum().item()
     return total_top1 / total_num * 100
-
-
-# GMM fitting to data for validation
-def gmm_monitor(net, memory_data_loader, test_data_loader, device='cuda', hide_progress=False,
-                targets=None, args=None):
-    if not targets:
-        targets = memory_data_loader.dataset.targets
-
-    net.eval()
-    classes = test_data_loader.num_classes
-
-    # covariance_type : {'full', 'tied', 'diag', 'spherical'}
-    covariance_type = 'full'
-    reps_train, labels_train = get_torch_reps(net, memory_data_loader, device, args)
-    reps_test, labels_test = get_torch_reps(net, test_data_loader, device, args)
-    gmm = GaussianMixture(classes, 
-                        random_state=0, 
-                        covariance_type=covariance_type).fit(reps_train)
-    gmm_cont_test_labels = gmm.predict(reps_test)
-    score = adjusted_rand_score(labels_test, gmm_cont_test_labels)*100
-
-    return score
 
 
 def save_reps(model, loader, ckpt_path, split='train', multi_chan=False,rep_after_proj=False, use_chan_pos=False, suffix=''):

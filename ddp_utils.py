@@ -11,6 +11,7 @@ import torch.nn.functional as F
 
 from sklearn.mixture import GaussianMixture
 from sklearn.metrics import adjusted_rand_score
+from utils import get_torch_reps
 
 class GatherLayer(torch.autograd.Function):
     """
@@ -106,27 +107,6 @@ def consume_prefix_in_state_dict_if_present(
             newkey = key[len(prefix) :]
             metadata[newkey] = metadata.pop(key)
 
-# get representations of data in torch tensor format
-def get_torch_reps(net, data_loader, device, args):
-    feature_bank = []
-    feature_labels = []
-    with torch.no_grad():
-        # generate feature bank
-        for data, target in data_loader:
-            if args.use_gpt:
-                feature = net(data.to(device=device, non_blocking=True).unsqueeze(dim=-1))
-            else:
-                feature = net(data.to(device=device, non_blocking=True).unsqueeze(dim=1))
-            feature = F.normalize(feature, dim=1)
-            feature_bank.append(feature)
-            feature_labels.append(target)
-        # [D, N]
-        feature_bank = torch.cat(feature_bank, dim=0).contiguous()
-        # [N]
-        feature_labels = torch.cat(torch.tensor(feature_labels, device=feature_bank.device), dim=0)
-    
-    return feature_bank, feature_labels
-
 
 # knn monitor as in InstDisc https://arxiv.org/abs/1805.01978
 # implementation follows http://github.com/zhirongw/lemniscate.pytorch and https://github.com/leftthomas/SimCLR
@@ -157,7 +137,7 @@ def gmm_monitor(net, memory_data_loader, test_data_loader, device='cuda', hide_p
         targets = memory_data_loader.dataset.targets
 
     net.eval()
-    classes = test_data_loader.num_classes
+    classes = test_data_loader.dataset.num_classes
 
     # covariance_type : {'full', 'tied', 'diag', 'spherical'}
     covariance_type = 'full'
@@ -173,7 +153,7 @@ def gmm_monitor(net, memory_data_loader, test_data_loader, device='cuda', hide_p
 
 
 # test using a knn monitor
-def knn_monitor(net, memory_data_loader, test_data_loader, num_classes, device='cuda', k=200, t=0.1, hide_progress=False,
+def knn_monitor(net, memory_data_loader, test_data_loader, device='cuda', k=200, t=0.1, hide_progress=False,
                 targets=None, args=None):
     if not targets:
         targets = memory_data_loader.dataset.targets
