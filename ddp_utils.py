@@ -8,6 +8,7 @@ from classy_vision.generic.distributed_util import (
 import random
 from PIL import Image, ImageOps, ImageFilter
 import torch.nn.functional as F
+import sys
 
 class GatherLayer(torch.autograd.Function):
     """
@@ -116,6 +117,7 @@ def knn_predict(feature, feature_bank, feature_labels, classes, knn_k, knn_t):
     sim_weight = (sim_weight / knn_t).exp()
 
     # counts for each class
+    # print(sim_labels)
     one_hot_label = torch.zeros(feature.size(0) * knn_k, classes, device=sim_labels.device)
     # [B*K, C]
     one_hot_label = one_hot_label.scatter(dim=-1, index=sim_labels.view(-1, 1), value=1.0)
@@ -126,13 +128,13 @@ def knn_predict(feature, feature_bank, feature_labels, classes, knn_k, knn_t):
     return pred_labels
 
 # test using a knn monitor
-def knn_monitor(net, memory_data_loader, test_data_loader, device='cuda', k=200, t=0.1, hide_progress=False,
+def knn_monitor(net, memory_data_loader, test_data_loader, use_fc=False, device='cuda', k=200, t=0.1, hide_progress=False,
                 targets=None, args=None):
     if not targets:
         targets = memory_data_loader.dataset.targets
 
     net.eval()
-    classes = 100
+    classes = args.num_classes
     # classes = len(memory_data_loader.dataset.classes)
     total_top1, total_top5, total_num, feature_bank = 0.0, 0.0, 0, []
     with torch.no_grad():
@@ -145,7 +147,8 @@ def knn_monitor(net, memory_data_loader, test_data_loader, device='cuda', k=200,
                 if args.use_chan_pos:
                     data, chan_pos = data
                 data = data.view(-1, int(args.num_extra_chans*2+1)*121)
-                data = torch.unsqueeze(data, dim=-1)
+                if not use_fc:
+                    data = torch.unsqueeze(data, dim=-1)
             
             if args.use_chan_pos:
                 feature = net(data.to(device=device, non_blocking=True), chan_pos=chan_pos.to(device=device, non_blocking=True))
@@ -172,7 +175,8 @@ def knn_monitor(net, memory_data_loader, test_data_loader, device='cuda', k=200,
                 else:
                     chan_pos = None
                 data = data.view(-1, int(args.num_extra_chans*2+1)*121)
-                data = torch.unsqueeze(data, dim=-1)
+                if not use_fc:
+                    data = torch.unsqueeze(data, dim=-1)
                 
             if args.use_chan_pos:
                 feature = net(data.to(device=device, non_blocking=True), chan_pos=chan_pos.to(device=device, non_blocking=True))
@@ -187,3 +191,43 @@ def knn_monitor(net, memory_data_loader, test_data_loader, device='cuda', k=200,
             total_top1 += (pred_labels[:, 0] == target).float().sum().item()
     return total_top1 / total_num * 100
 
+
+def get_torch_reps(net, data_loader, device, args):
+    feature_bank = []
+    feature_labels = []
+    with torch.no_grad():
+        # generate feature bank
+        for data, target in data_loader:
+            if args.use_gpt:
+                feature = net(data.to(device=device, non_blocking=True).unsqueeze(dim=-1))
+            else:
+                feature = net(data.to(device=device, non_blocking=True).unsqueeze(dim=1))
+            feature = F.normalize(feature, dim=1)
+            feature_bank.append(feature)
+            feature_labels.append(target)
+        # [D, N]
+        feature_bank = torch.cat(feature_bank, dim=0).contiguous()
+        # [N]
+        feature_labels = torch.cat(torch.tensor(feature_labels, device=feature_bank.device), dim=0)
+
+    return feature_bank, feature_labels
+
+def gmm_monitor(net, memory_data_loader, test_data_loader, device='cuda', hide_progress=False,
+                targets=None, args=None):
+    if not targets:
+        targets = memory_data_loader.dataset.targets
+
+    net.eval()
+    classes = test_data_loader.num_classes
+
+    # covariance_type : {'full', 'tied', 'diag', 'spherical'}
+    covariance_type = 'full'
+    reps_train, labels_train = get_torch_reps(net, memory_data_loader, device, args)
+    reps_test, labels_test = get_torch_reps(net, test_data_loader, device, args)
+    gmm = GaussianMixture(classes, 
+                        random_state=0, 
+                        covariance_type=covariance_type).fit(reps_train)
+    gmm_cont_test_labels = gmm.predict(reps_test)
+    score = adjusted_rand_score(labels_test, gmm_cont_test_labels)*100
+
+    return score

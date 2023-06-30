@@ -170,6 +170,7 @@ class GPTConfig:
     half_embed_each: bool = False
     remove_pos: bool = False
     concat_pos: bool = False
+    num_classes: int = 10
 
 class Single_GPT(nn.Module):
 
@@ -211,7 +212,7 @@ class Single_GPT(nn.Module):
                     self.chan_pos_enc = nn.Linear(config.n_coords, config.n_embd)
                     
         self.projector = Projector(rep_dim=config.out_dim, proj_dim=config.proj_dim)
-        self.online_head = nn.Linear(config.out_dim, 10) # 10 classes
+        self.online_head = nn.Linear(config.out_dim, config.num_classes) # 10 classes
         
         # with weight tying when using torch.compile() some warnings get generated:
         # "UserWarning: functional_call was passed multiple values for tied weights.
@@ -580,7 +581,7 @@ class Multi_GPT(nn.Module):
                     pos = torch.cat([torch.Tensor([i]).long().repeat(121) for i in range(self.tot_chans)]).unsqueeze(0).to(device)
                 else:
                     if self.config.concat_pos:
-                        pos = torch.arange(0, t+11, dtype=torch.long, device=device).unsqueeze(0) # shape (1, t)
+                        pos = torch.arange(0, t+(self.config.n_extra_chans*2+1), dtype=torch.long, device=device).unsqueeze(0) # shape (1, t)
                     else:
                         pos = torch.arange(0, t, dtype=torch.long, device=device).unsqueeze(0) # shape (1, t)
             else:

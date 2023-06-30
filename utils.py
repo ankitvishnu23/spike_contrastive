@@ -237,7 +237,7 @@ def knn_monitor(net, memory_data_loader, test_data_loader, device='cuda', k=200,
         targets = memory_data_loader.dataset.targets
 
     net.eval()
-    classes = 100
+    classes = args.num_classes
     # classes = len(memory_data_loader.dataset.classes)
     total_top1, total_top5, total_num, feature_bank = 0.0, 0.0, 0, []
     with torch.no_grad():
@@ -270,7 +270,7 @@ def knn_monitor(net, memory_data_loader, test_data_loader, device='cuda', k=200,
             total_top1 += (pred_labels[:, 0] == target).float().sum().item()
     return total_top1 / total_num * 100
 
-def save_reps(model, loader, ckpt_path, split='train', multi_chan=False,rep_after_proj=False, use_chan_pos=False, suffix=''):
+def save_reps(model, loader, ckpt_path, num_chan=11, use_fc=False, split='train', multi_chan=False,rep_after_proj=False, use_chan_pos=False, suffix=''):
     ckpt_root_dir = '/'.join(ckpt_path.split('/')[:-1])
     model.eval()
     feature_bank = []
@@ -283,8 +283,9 @@ def save_reps(model, loader, ckpt_path, split='train', multi_chan=False,rep_afte
                 if use_chan_pos:
                     data,chan_pos = data
 
-                data = data.view(-1, 11*121)
-                data = torch.unsqueeze(data, dim=-1)
+                data = data.view(-1, num_chan*121)
+                if not use_fc:
+                    data = torch.unsqueeze(data, dim=-1)
             
             if use_chan_pos:
                 feature = model(data.cuda(non_blocking=True), chan_pos=chan_pos.cuda(non_blocking=True))

@@ -10,7 +10,7 @@ source ${CONDA_ROOT}/etc/profile.d/conda.sh
 conda activate $PYTHON_VIRTUAL_ENVIRONMENT
 ulimit -s unlimited
 
-for lr in 0.0005 0.0001
+for lr in 0.0001
 do
 python \
       $HOME2/scratch/spike_contrastive/launcher.py \

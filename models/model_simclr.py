@@ -175,19 +175,19 @@ class Encoder2(nn.Module):
         return x
 
 class FullyConnectedEnc(nn.Module):
-    def __init__(self, Lv=[121, 550, 1100, 250], out_size=2, proj_dim=5, fc_depth=2):
+    def __init__(self, blocksize = 121, Lv=[1024, 1024, 256], out_size=2, proj_dim=5, fc_depth=2):
         super(FullyConnectedEnc, self).__init__()
         self.proj_dim = out_size if out_size < proj_dim else proj_dim
 
         self.fcpart = nn.Sequential(
-            nn.Linear(Lv[0], Lv[1]),
+            nn.Linear(blocksize, Lv[0]),
             nn.ReLU(),
             # nn.Dropout(p=0.2),
+            nn.Linear(Lv[0], Lv[1]),
+            nn.ReLU(),
             nn.Linear(Lv[1], Lv[2]),
             nn.ReLU(),
-            nn.Linear(Lv[2], Lv[3]),
-            nn.ReLU(),
-            nn.Linear(Lv[3], out_size),
+            nn.Linear(Lv[2], out_size),
             Projector(rep_dim=out_size, proj_dim=self.proj_dim)
             )
         self.Lv = Lv

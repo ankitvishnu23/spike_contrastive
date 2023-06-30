@@ -26,7 +26,7 @@ python \
       --log-dir $HOME2/scratch/spike_contrastive/logs/ \
       --ngpus-per-node 4 \
       --nodes 4 \
-      --exp 0513_outdim5proj5_mc_gpt_conseq_causal_nembd64_block1342_bs128_extra5_lr${lr}_knn10_addtrain_concatpos \
+      --exp 0513_outdim5proj5_mc_gpt_conseq_causal_nembd64_block1342_bs128_extra5_lr${lr}_knn10_addtrain_concatpos_2 \
       --block_size 1342 \
       --n_embd 64 \
       --multi_chan \

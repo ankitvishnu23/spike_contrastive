@@ -109,7 +109,7 @@ def main_worker(gpu, args):
     if args.use_gpt:
         model_args = dict(n_layer=args.n_layer, n_head=args.n_head, n_embd=args.n_embd, block_size=args.block_size,
                   bias=args.bias, vocab_size=args.vocab_size, dropout=args.dropout, out_dim=args.out_dim, is_causal=args.is_causal, 
-                  proj_dim=args.proj_dim, pos=args.pos_enc, multi_chan=args.multi_chan) 
+                  proj_dim=args.proj_dim, pos=args.pos_enc, multi_chan=args.multi_chan, num_classes=args.num_classes) 
         gptconf = GPTConfig(**model_args)
         model = Single_GPT(gptconf).cuda(gpu)
     else:
@@ -288,6 +288,8 @@ if __name__ == "__main__":
     parser.add_argument('--detected_spikes', action='store_true') # default = False
     parser.add_argument('--no_knn', action='store_true') # default = False
     parser.add_argument('--test_split', default ='test', type=str)    
+    parser.add_argument("--num_classes", default=400, type=int)    
+    
 
     args = parser.parse_args()
     

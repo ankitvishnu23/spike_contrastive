@@ -603,7 +603,7 @@ python run.py --out_dim=128 --proj_dim=5 --batch-size=512 --lr=0.001 --epochs=80
 
 
 python main.py \
-      --data /gpfs/u/home/BNSS/BNSSlhch/scratch/spike_data/multi_dy016_detected_spikes_05_13_2023 \
+      --data /gpfs/u/home/BNSS/BNSSlhch/scratch/spike_data/multi_400_random_neurons_5chan_05_19_2023 \
              --workers 32\
                     --epochs 800       \
                     --batch-size 4       \
@@ -613,18 +613,105 @@ python main.py \
                       --learning-rate 0.0001    \
                          --checkpoint-dir /gpfs/u/home/BNSS/BNSSlhch/scratch/spike_contrastive/saved_models/       \
                          --log-dir /gpfs/u/home/BNSS/BNSSlhch/scratch/spike_contrastive/logs/       \
-                         --ngpus-per-node 4       \
-                         --nodes 4       \
-                         --exp test_detected_concatpos       \
-                         --block_size 1342    \
+                         --ngpus-per-node 1       \
+                         --nodes 1       \
+                         --exp test_400n_ccpos       \
+                         --block_size 610  \
                          --n_embd 64       \
                          --multi_chan       \
                          --pos_enc conseq      \
                           --is_causal       \
-                          --num_extra_chans 5       \
+                          --num_extra_chans 2       \
                           --knn-freq 10       \
                           --add_train \
-                          --detected_spikes \
-                          --no_knn \
+                          --num_classes 400 \
                           --use_chan_pos \
                           --concat_pos
+
+python \
+      $HOME2/scratch/spike_contrastive/launcher.py \
+      --data $HOME2/scratch/spike_data/multi_400_random_neurons_5chan_05_19_2023 \
+      --workers 32 \
+      --epochs 800 \
+      --batch-size 512 \
+      --out_dim 5 \
+      --proj_dim 5 \
+      --optimizer adam \
+      --learning-rate ${lr} \
+      --checkpoint-dir $HOME2/scratch/spike_contrastive/saved_models/ \
+      --log-dir $HOME2/scratch/spike_contrastive/logs/ \
+      --ngpus-per-node 4 \
+      --nodes 8 \
+      --exp 0519_outdim5proj5_mc_gpt_conseq_causal_nembd64_block605_bs512_extra2_lr${lr}_knn10_addtrain \
+      --block_size 610 \
+      --n_embd 64 \
+      --multi_chan \
+      --pos_enc conseq \
+      --is_causal \
+      --num_extra_chans 2 \
+      --knn-freq 10 \
+      --add_train \
+      --num_classes 400
+      --use_chan_pos \
+      --concat_pos
+
+python run.py --out_dim=128 --proj_dim=5 --batch-size=512 --lr=0.001 --epochs=800 --fp16 --use_gpt --is_causal --n_embd=32 --add_train --dropout=0.0 --cell_type --data=/home/gridsan/cloh/spike_data/single_dy016_random_cell_type_normalized_05_12_2023 --exp=0514cellrandout_dim128proj_dim5batch-size512lr0.001epochs800fp16use_gptis_causaln_embd32add_traindropout0.0cell_type
+python run.py --out_dim=128 --proj_dim=5 --batch-size=512 --lr=0.001 --epochs=800 --fp16 --use_gpt --is_causal --n_embd=32 --add_train --dropout=0.0 --cell_type --data=/home/gridsan/cloh/spike_data/single_dy016_cell_type_good_units_05_14_2023 --exp=0514cellgoodout_dim128proj_dim5batch-size512lr0.001epochs800fp16use_gptis_causaln_embd32add_traindropout0.0cell_type
+python run.py --out_dim=128 --proj_dim=5 --batch-size=512 --lr=0.001 --epochs=800 --fp16 --use_gpt --is_causal --n_embd=32 --add_train --dropout=0.0 --data=/home/gridsan/evanv/charlotte/spike_data/single_dy016_random_neurons_05_13_2023 --exp=0513dataout_dim128proj_dim5batch-size512lr0.001epochs800fp16use_gptis_causaln_embd32add_traindropout0.0
+python run.py --out_dim=128 --proj_dim=5 --batch-size=512 --lr=0.001 --epochs=800 --fp16 --use_gpt --is_causal --n_embd=32 --add_train --dropout=0.0 --data=/home/gridsan/evanv/charlotte/spike_data/single_mearec_random_neurons_05_14_2023 --exp=0514_mearecout_dim128proj_dim5batch-size512lr0.001epochs800fp16use_gptis_causaln_embd32add_traindropout0.0
+python run.py --out_dim=128 --proj_dim=5 --batch-size=512 --lr=0.001 --epochs=800 --fp16 --use_gpt --is_causal --n_embd=32 --add_train --detected_spikes --no_knn --dropout=0.0 --data=/home/gridsan/evanv/charlotte/spike_data/single_dy016_detected_spikes_05_13_2023 --exp=0514out_dim128proj_dim5batch-size512lr0.001epochs800fp16use_gptis_causaln_embd32add_traindetected_spikesno_knndropout0.0
+
+
+for bs in 512 
+do
+for lr in 0.001 
+do
+for nembd in 32 
+do
+for dim in 5
+do
+python run.py --add_prefix=0515mearec_cell --submit --arg_str="--out_dim=128 --proj_dim=${dim} --batch-size=${bs} --lr=${lr} --epochs=800 --fp16 --use_gpt --is_causal --n_embd=${nembd} --add_train --dropout=0.0 --cell_type --data=/home/gridsan/cloh/spike_data/single_mearec_cell_type_all_units_05_14_2023 "
+done
+done
+done
+done
+
+python run.py --submit --add_prefix=0523cell400n --arg_str="--out_dim=128 --proj_dim=5 --batch-size=512 --lr=0.001 --epochs=800 --fp16 --use_gpt --is_causal --n_embd=32 --add_train --dropout=0.0 --cell_type --num_classes=400 --eval_knn_every_n_epochs=25 --data=/home/gridsan/cloh/spike_data/single_400_neuron_cell_type_05_23_2023 "
+python run.py --out_dim=128 --proj_dim=5 --batch-size=512 --lr=0.001 --epochs=800 --fp16 --use_gpt --is_causal --n_embd=32 --add_train --dropout=0.0 --cell_type --data=/home/gridsan/cloh/spike_data/single_400_neuron_cell_type_05_23_2023 --exp=0523_newcell --num_classes=400 --eval_knn_every_n_epochs=1
+
+
+for lr in 0.001 
+do
+for nembd in 64
+do
+python run.py --submit --add_prefix=0523cell400n --arg_str="--out_dim=128 --proj_dim=5 --batch-size=512 --lr=${lr} --epochs=800 --fp16 --use_gpt --is_causal --n_embd=${nembd} --add_train --dropout=0.0 --cell_type --num_classes=400 --eval_knn_every_n_epochs=25 --data=/home/gridsan/cloh/spike_data/single_400_neuron_cell_type_05_23_2023 "
+done
+done
+
+for lr in 0.005 
+do
+for nembd in 64 32
+do
+python run.py --submit --add_prefix=0523cell400n --arg_str="--out_dim=128 --proj_dim=5 --batch-size=512 --lr=${lr} --epochs=800 --fp16 --use_gpt --is_causal --n_embd=${nembd} --add_train --dropout=0.0 --cell_type --num_classes=400 --eval_knn_every_n_epochs=25 --data=/home/gridsan/cloh/spike_data/single_400_neuron_cell_type_05_23_2023 "
+done
+done
+
+for lr in 0.005 
+do
+for nembd in 64 32
+do
+python run.py --submit --add_prefix=0523cell400n --arg_str="--out_dim=128 --proj_dim=5 --batch-size=512 --lr=${lr} --epochs=800 --fp16 --use_gpt --is_causal --n_embd=${nembd} --add_train --dropout=0.0 --cell_type --num_classes=400 --eval_knn_every_n_epochs=25 --data=/home/gridsan/cloh/spike_data/single_400_neuron_cell_type_05_23_2023 "
+done
+done
+
+for lr in 0.001 0.0005 0.00001
+do
+python main.py --submit --add_prefix=0612 --arg_str="--use_fc --lr=${lr} --num_classes=400 --multi_chan --num_extra_chans 2 --batch-size 128 --block_size 605 "
+done
+
+for lr in 0.001 0.0005 0.0001 
+do
+python main.py --submit --add_prefix=0612 --arg_str="--use_fc --lr=${lr} --num_classes=400 --multi_chan --num_extra_chans 2 --batch-size 128 --block_size 605 --knn-freq 50 "
+done
+
+--use_fc --lr=0.001 --num_classes=400 --multi_chan --num_extra_chans 2 --batch-size 128 --block_size 605

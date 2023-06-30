@@ -188,7 +188,9 @@ class WFDataset_lab(Dataset):
         if split == 'train':
             print(multi_chan, self.train_set_fn)
             self.data = np.load(os.path.join(root, self.train_set_fn)).astype('float32')
-            self.targets = np.load(os.path.join(root, self.train_targets_fn))
+            # self.targets = np.load(os.path.join(root, self.train_targets_fn), allow_pickle=True)
+            self.targets = np.load(os.path.join(root, self.train_targets_fn)).astype('long')
+            
             self.chan_nums = np.load(os.path.join(root, self.spike_mcs_train_fn))
             self.channel_locs = np.load(os.path.join(root, self.chan_coords_train_fn))
         elif split == 'test':

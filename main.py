@@ -20,6 +20,7 @@ from ddp_utils import gather_from_all
 
 from data_aug.contrastive_learning_dataset import ContrastiveLearningDataset, WFDataset_lab
 from models.model_GPT import GPTConfig, Multi_GPT, Projector
+from models.model_simclr import FullyConnectedEnc
 from ddp_utils import knn_monitor
 from data_aug.wf_data_augs import Crop
 from load_models import save_reps
@@ -58,7 +59,7 @@ def main_worker(gpu, args):
         torch.distributed.init_process_group(
             backend='nccl', init_method=args.dist_url,
             world_size=args.world_size, rank=args.rank)
-
+    
     if args.rank == 0:
         args.checkpoint_dir.mkdir(parents=True, exist_ok=True)
         stats_file = open(args.checkpoint_dir / 'stats.txt', 'a', buffering=1)
@@ -71,7 +72,12 @@ def main_worker(gpu, args):
     torch.backends.cudnn.benchmark = True
 
     model = SimCLR(args).cuda(gpu)
-
+    print("no. of backbone params:", sum(p.numel() for n,p in model.named_parameters() if 'backbone' in n))
+    print("no. of projector params:", sum(p.numel() for n,p in model.named_parameters() if 'projector' in n))
+    print("no. of online head params:", sum(p.numel() for n,p in model.named_parameters() if 'online' in n))
+    
+    # for n,p in model.named_parameters():
+    #     print(n, p.shape)
     if args.ddp:
         model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[gpu],find_unused_parameters=True)
@@ -117,13 +123,15 @@ def main_worker(gpu, args):
             dataset, batch_size=args.batch_size, num_workers=args.workers,
             pin_memory=True, drop_last=True)
     
+    test_split = 'val' if not args.use_test_split else 'test'
+    
     if args.rank == 0 and not args.no_knn:
         if args.multi_chan:
             memory_dataset = WFDataset_lab(args.data, split='train', multi_chan=args.multi_chan, transform=Crop(prob=0.0, num_extra_chans=num_extra_chans, ignore_chan_num=True), use_chan_pos=args.use_chan_pos)
             memory_loader = torch.utils.data.DataLoader(
                 memory_dataset, batch_size=128, shuffle=False,
                 num_workers=args.workers, pin_memory=True, drop_last=False)
-            test_dataset = WFDataset_lab(args.data, split='test', multi_chan=args.multi_chan, transform=Crop(prob=0.0, num_extra_chans=num_extra_chans, ignore_chan_num=True), use_chan_pos=args.use_chan_pos)
+            test_dataset = WFDataset_lab(args.data, split=test_split, multi_chan=args.multi_chan, transform=Crop(prob=0.0, num_extra_chans=num_extra_chans, ignore_chan_num=True), use_chan_pos=args.use_chan_pos)
             test_loader = torch.utils.data.DataLoader(
                 test_dataset, batch_size=args.batch_size, shuffle=False,
                 num_workers=args.workers, pin_memory=True, drop_last=False)
@@ -132,7 +140,7 @@ def main_worker(gpu, args):
             memory_loader = torch.utils.data.DataLoader(
                 memory_dataset, batch_size=128, shuffle=False,
                 num_workers=args.workers, pin_memory=True, drop_last=False)
-            test_dataset = WFDataset_lab(args.data, split='test', multi_chan=False)
+            test_dataset = WFDataset_lab(args.data, split=test_split, multi_chan=False)
             test_loader = torch.utils.data.DataLoader(
                 test_dataset, batch_size=args.batch_size, shuffle=False,
                 num_workers=args.workers, pin_memory=True, drop_last=False)
@@ -140,10 +148,14 @@ def main_worker(gpu, args):
     start_time = time.time()
     scaler = torch.cuda.amp.GradScaler()
     
+    # print("testing save rep and knn")
+    # save_reps(model, test_loader, args.checkpoint_dir / 'checkpoint.pth', use_fc=args.use_fc, split='test', multi_chan=True, rep_after_proj=False, use_chan_pos=args.use_chan_pos, ckpt_root_dir=args.checkpoint_dir)
+    # knn_score = knn_monitor(net=model, memory_data_loader=memory_loader, test_data_loader=test_loader, use_fc=args.use_fc, device='cuda',k=200, hide_progress=True, args=args)
+    
     # test knn first
     # if args.rank == 0:
-        # knn_score = knn_monitor(net=model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True, args=args)
-        # print(f"my knn_acc:{knn_score}")  
+    #     knn_score = knn_monitor(net=model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True, args=args)
+    #     print(f"my knn_acc:{knn_score}")  
     for epoch in range(start_epoch, args.epochs):
                 
         model.train()
@@ -164,13 +176,14 @@ def main_worker(gpu, args):
                 y2 = wf[1].float()
                 chan_pos = None
                 chan_pos2 = None
-                
+            
             if not args.multi_chan:
                 y1, y2 = torch.squeeze(y1, dim=1), torch.squeeze(y2, dim=1)
                 y1, y2 = torch.unsqueeze(y1, dim=-1), torch.unsqueeze(y2, dim=-1)
             else:
                 y1, y2 = y1.view(-1, (args.num_extra_chans*2+1)*121), y2.view(-1, (args.num_extra_chans*2+1)*121)
-                y1, y2 = torch.unsqueeze(y1, dim=-1), torch.unsqueeze(y2, dim=-1)
+                if not args.use_fc:
+                    y1, y2 = torch.unsqueeze(y1, dim=-1), torch.unsqueeze(y2, dim=-1)
             y1 = y1.cuda(gpu, non_blocking=True)
             y2 = y2.cuda(gpu, non_blocking=True)
             if args.use_chan_pos:
@@ -215,8 +228,8 @@ def main_worker(gpu, args):
                 torch.save(state, args.checkpoint_dir / 'checkpoint_epoch{}.pth'.format(epoch))
             
             if epoch % 50 == 0 and not args.no_knn:
-                save_reps(model, memory_loader, args.checkpoint_dir / 'checkpoint.pth', split='train', multi_chan=True, rep_after_proj=False, use_chan_pos=args.use_chan_pos)
-                save_reps(model, test_loader, args.checkpoint_dir / 'checkpoint.pth', split='test', multi_chan=True, rep_after_proj=False, use_chan_pos=args.use_chan_pos)
+                save_reps(model, memory_loader, args.checkpoint_dir / 'checkpoint.pth', use_fc=args.use_fc, split='train', multi_chan=True, rep_after_proj=False, use_chan_pos=args.use_chan_pos, ckpt_root_dir=args.checkpoint_dir)
+                save_reps(model, test_loader, args.checkpoint_dir / 'checkpoint.pth', use_fc=args.use_fc, split='test', multi_chan=True, rep_after_proj=False, use_chan_pos=args.use_chan_pos, ckpt_root_dir=args.checkpoint_dir)
 
             # log to tensorboard
             logger.log_value('loss', loss.item(), epoch)
@@ -224,7 +237,7 @@ def main_worker(gpu, args):
             logger.log_value('learning_rate', lr, epoch)
             
             if epoch % args.knn_freq == 0  and not args.no_knn:
-                knn_score = knn_monitor(net=model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True, args=args)
+                knn_score = knn_monitor(net=model, memory_data_loader=memory_loader, test_data_loader=test_loader, use_fc=args.use_fc, device='cuda',k=200, hide_progress=True, args=args)
                 print(f"Epoch {epoch}, my knn_acc:{knn_score}")  
                 logger.log_value('knn_acc', knn_score, epoch)
 
@@ -258,7 +271,10 @@ class SimCLR(nn.Module):
     def __init__(self, args):
         super().__init__()
         num_extra_chans = args.num_extra_chans if args.multi_chan else 0
-        model_args = dict(n_layer=args.n_layer, n_head=args.n_head, n_embd=args.n_embd, block_size=args.block_size,
+        if args.use_fc:
+            self.backbone = FullyConnectedEnc(blocksize=args.block_size, out_size=args.out_dim, proj_dim=args.proj_dim)
+        else:
+            model_args = dict(n_layer=args.n_layer, n_head=args.n_head, n_embd=args.n_embd, block_size=args.block_size,
                   bias=args.bias, vocab_size=args.vocab_size, dropout=args.dropout, out_dim=args.out_dim, is_causal=args.is_causal, 
                   proj_dim=args.proj_dim, pos=args.pos_enc, multi_chan=args.multi_chan, 
                   use_chan_pos=args.use_chan_pos, n_extra_chans=num_extra_chans,
@@ -266,13 +282,13 @@ class SimCLR(nn.Module):
                   half_embed_each=args.half_embed_each, remove_pos = args.remove_pos,
                   concat_pos=args.concat_pos
                   ) 
-        gptconf = GPTConfig(**model_args)
-        self.backbone = Multi_GPT(gptconf)
+            gptconf = GPTConfig(**model_args)
+            self.backbone = Multi_GPT(gptconf)
         self.args = args
         
         # projector
-        self.projector = Projector(rep_dim=gptconf.out_dim, proj_dim=gptconf.proj_dim)
-        self.online_head = nn.Linear(gptconf.out_dim, 10) # 10 classes
+        self.projector = Projector(rep_dim=args.out_dim, proj_dim=args.proj_dim)
+        self.online_head = nn.Linear(args.out_dim, args.num_classes) # 10 classes
 
 
     def forward(self, y1, y2=None, labels=None, chan_pos=None, chan_pos2=None):
@@ -364,6 +380,42 @@ class LARS(optim.Optimizer):
 def exclude_bias_and_norm(p):
     return p.ndim == 1
 
+
+def make_sh_and_submit(args):
+    os.makedirs('./scripts/', exist_ok=True)
+    os.makedirs('./logs/', exist_ok=True)
+    options = args.arg_str
+    if '--data' in options:
+        name = ''.join([opt1.replace("--","").replace("=","") for opt1 in options.split(" ")[:-2]])
+        name = args.add_prefix + name
+        if 'spike_data' in name:
+            assert "data needs to be the last argument"
+    else:
+        name = ''.join([opt1.replace("--","").replace("=","") for opt1 in options.split(" ")])
+        name = args.add_prefix + name
+    import getpass
+    username = getpass.getuser()
+    preamble = (
+        f'#!/bin/sh\n#SBATCH --cpus-per-task=20\n#SBATCH --gres=gpu:volta:1\n#SBATCH '
+        f'-o ./logs/{name}.out\n#SBATCH '
+        f'--job-name={name}\n#SBATCH '
+        f'--open-mode=append\n\n'
+    )
+    with open(f'./scripts/{name}.sh', 'w') as file:
+        file.write(preamble)
+        file.write("echo \"current time: $(date)\";\n")
+        file.write(
+            f'python {sys.argv[0]} '
+            f'{options} --exp={name} '
+        )
+        # if args.server == 'sc' or args.server == 'rumensc':
+            # file.write(f'--data_root=/home/gridsan/{username}/MAML-Soljacic/cifar_stl_data/ ')
+        # file.write(f'--data_root=/home/gridsan/groups/MAML-Soljacic/cifar_stl_data/ ')
+    print('Submitting the job with options: ')
+    print(options)
+
+    os.system(f'sbatch ./scripts/{name}.sh')
+
 def main(args):
     print("Starting Non-DDP training..")
     args.checkpoint_dir = args.checkpoint_dir / args.exp
@@ -374,19 +426,20 @@ def main(args):
     
     main_worker(0, args)
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='SimCLR Training')
-    parser.add_argument('--data', type=Path, metavar='DIR', default= '/gpfs/u/home/BNSS/BNSSlhch/scratch/spike_data/dy016',
+    parser.add_argument('--data', type=Path, metavar='DIR', default= '/home/gridsan/cloh/spike_data/multi_400_random_neurons_5chan_05_19_2023',
                         help='path to dataset')
     parser.add_argument('--dataset', type=str, default='imagenet', choices=['imagenet', 'cifar100'],
                         help='dataset (imagenet, cifar100)')
-    parser.add_argument('--workers', default=8, type=int, metavar='N',
+    parser.add_argument('--workers', default=32, type=int, metavar='N',
                         help='number of data loader workers')
     parser.add_argument('--epochs', default=800, type=int, metavar='N',
                         help='number of total epochs to run')
-    parser.add_argument('--batch-size', default=128, type=int, metavar='N',
+    parser.add_argument('--batch-size', default=512, type=int, metavar='N',
                         help='mini-batch size')
-    parser.add_argument('--learning-rate', default=0.001, type=float, metavar='LR',
+    parser.add_argument('--learning-rate', '--lr', default=0.001, type=float, metavar='LR',
                         help='base learning rate')
     parser.add_argument('--weight-decay', default=1e-6, type=float, metavar='W',
                         help='weight decay')
@@ -396,9 +449,9 @@ if __name__ == "__main__":
                         help='save frequency')
     parser.add_argument('--topk-path', type=str, default='./imagenet_resnet50_top10.pkl',
                         help='path to topk predictions from pre-trained classifier')
-    parser.add_argument('--checkpoint-dir', type=Path, default='/gpfs/u/home/BNSS/BNSSlhch/scratch/spike_ddp/saved_models_int/',
+    parser.add_argument('--checkpoint-dir', type=Path, default='./saved_models_i/',
                         metavar='DIR', help='path to checkpoint directory')
-    parser.add_argument('--log-dir', type=Path , default='/gpfs/u/home/BNSS/BNSSlhch/scratch/spike_ddp/logs_int/',
+    parser.add_argument('--log-dir', type=Path , default='./logs_i/',
                         metavar='LOGDIR', help='path to tensorboard log directory')
     parser.add_argument('--rotation', default=0.0, type=float,
                         help="coefficient of rotation loss")
@@ -471,7 +524,7 @@ if __name__ == "__main__":
     parser.add_argument('--num_extra_chans', default=0, type=int)
     parser.add_argument('--knn-freq', default=1, type=int, metavar='N',
                         help='save frequency')
-    parser.add_argument('--add_train', action='store_true') # default = False
+    parser.add_argument('--add_train', action='store_true', default = True) 
     parser.add_argument('--use_chan_pos', action='store_true') # default = False
     parser.add_argument('--use_merge_layer', action='store_true') # default = False
     parser.add_argument('--add_layernorm', action='store_true') # default = False
@@ -483,9 +536,16 @@ if __name__ == "__main__":
     parser.add_argument('--p_crop', default=0.5, type=float)
     parser.add_argument('--detected_spikes', action='store_true') # default = False
     parser.add_argument('--concat_pos', action='store_true') # default = False
-    
-    
+    parser.add_argument("--num_classes", default=400, type=int)    
+    parser.add_argument('--use_test_split', action='store_true') # default = False
+    parser.add_argument('--use_fc', action='store_true') # default = False
+    parser.add_argument('--submit', action='store_true') # default = False
+    parser.add_argument('--arg_str', default='--', type=str)
+    parser.add_argument('--add_prefix', default='', type=str)
     args = parser.parse_args()
     
-    main(args)
+    if args.submit:
+        make_sh_and_submit(args)
+    else:
+        main(args)
     

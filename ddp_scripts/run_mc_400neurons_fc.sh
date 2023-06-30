@@ -10,14 +10,14 @@ source ${CONDA_ROOT}/etc/profile.d/conda.sh
 conda activate $PYTHON_VIRTUAL_ENVIRONMENT
 ulimit -s unlimited
 
-for lr in 0.0001
+for lr in 0.001 0.0005 0.0001
 do
 python \
       $HOME2/scratch/spike_contrastive/launcher.py \
-      --data $HOME2/scratch/spike_data/multi_dy016_random_neurons_05_13_2023 \
+      --data $HOME2/scratch/spike_data/multi_400_random_neurons_5chan_05_19_2023 \
       --workers 32 \
       --epochs 800 \
-      --batch-size 128 \
+      --batch-size 512 \
       --out_dim 5 \
       --proj_dim 5 \
       --optimizer adam \
@@ -25,19 +25,20 @@ python \
       --checkpoint-dir $HOME2/scratch/spike_contrastive/saved_models/ \
       --log-dir $HOME2/scratch/spike_contrastive/logs/ \
       --ngpus-per-node 4 \
-      --nodes 4 \
-      --exp 0513_outdim5proj5_mc_gpt_conseq_causal_nembd64_block1342_bs128_extra5_lr${lr}_knn10_addtrain_concatpos \
-      --block_size 1342 \
-      --n_embd 64 \
+      --nodes 1 \
+      --exp 0612_FC_outdim5proj5_mc_block605_bs512_extra2_lr${lr}_knn10_addtrain \
+      --block_size 605 \
       --multi_chan \
-      --pos_enc conseq \
-      --is_causal \
-      --num_extra_chans 5 \
-      --knn-freq 10 \
+      --num_extra_chans 2 \
+      --knn-freq 50 \
       --add_train \
-      --use_chan_pos \
-      --concat_pos 
+      --num_classes 400 \
+      --use_fc
+
 done
 echo "Run completed at:- "
 date
+
+
+
 

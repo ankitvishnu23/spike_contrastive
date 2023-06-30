@@ -117,6 +117,9 @@ parser.add_argument('--cell_type', action='store_true') # default = False
 parser.add_argument('--no_knn', action='store_true') # default = False
 parser.add_argument('--detected_spikes', action='store_true') # default = False
 parser.add_argument('--concat_pos', action='store_true') # default = False
+parser.add_argument("--num_classes", default=10, type=int)    
+parser.add_argument('--use_test_split', action='store_true') # default = False
+parser.add_argument('--use_fc', action='store_true') # default = False
 
 class Trainer(object):
     def __init__(self, args):

@@ -5,13 +5,15 @@ from data_aug.wf_data_augs import Crop
 import os
 
 class Encoder(torch.nn.Module):
-    def __init__(self, multi_chan = False, rep_dim=5, proj_dim=5, pos_enc='conseq', rep_after_proj=False, use_chan_pos=False, use_merge_layer=False, add_layernorm=False, half_embed_each=False, concat_pos=False):
+    def __init__(self, multi_chan = False, rep_dim=5, proj_dim=5, block_size=1331,pos_enc='conseq', rep_after_proj=False, use_chan_pos=False, use_merge_layer=False, add_layernorm=False, half_embed_each=False, concat_pos=False):
         super().__init__()
         if multi_chan:
-            if concat_pos:
-                model_args = dict(bias=False, block_size=1342, n_layer=20, n_head =4, n_embd=64, dropout=0.2, out_dim=rep_dim, proj_dim=proj_dim, is_causal=True, pos = pos_enc, multi_chan=True, use_chan_pos=use_chan_pos, use_merge_layer=use_merge_layer, add_layernorm=add_layernorm, half_embed_each=half_embed_each, concat_pos=concat_pos)
-            else:    
-                model_args = dict(bias=False, block_size=1331, n_layer=20, n_head =4, n_embd=64, dropout=0.2, out_dim=rep_dim, proj_dim=proj_dim, is_causal=True, pos = pos_enc, multi_chan=True, use_chan_pos=use_chan_pos, use_merge_layer=use_merge_layer, add_layernorm=add_layernorm, half_embed_each=half_embed_each, concat_pos=concat_pos)
+            # if concat_pos:
+            # model_args = dict(bias=False, block_size=block_size, n_layer=20, n_head =4, n_embd=64, dropout=0.2, out_dim=rep_dim, proj_dim=proj_dim, is_causal=True, pos = pos_enc, multi_chan=True, use_chan_pos=use_chan_pos, use_merge_layer=use_merge_layer, add_layernorm=add_layernorm, half_embed_each=half_embed_each, concat_pos=concat_pos)
+            # else:    
+                # model_args = dict(bias=False, block_size=1331, n_layer=20, n_head =4, n_embd=64, dropout=0.2, out_dim=rep_dim, proj_dim=proj_dim, is_causal=True, pos = pos_enc, multi_chan=True, use_chan_pos=use_chan_pos, use_merge_layer=use_merge_layer, add_layernorm=add_layernorm, half_embed_each=half_embed_each, concat_pos=concat_pos)
+            model_args = dict(n_extra_chans=2,bias=False, block_size=block_size, n_layer=20, n_head =4, n_embd=64, dropout=0.2, out_dim=rep_dim, proj_dim=proj_dim, is_causal=True, pos = pos_enc, multi_chan=True, use_chan_pos=use_chan_pos, use_merge_layer=use_merge_layer, add_layernorm=add_layernorm, half_embed_each=half_embed_each, concat_pos=concat_pos)
+        
         else:
             model_args = dict(bias=False, block_size=121, n_layer=20, n_head =4, n_embd=32, dropout=0.2, out_dim=rep_dim, proj_dim=proj_dim, is_causal=True, pos = pos_enc, multi_chan=False)
         gptconf = GPTConfig(**model_args)
@@ -34,9 +36,9 @@ class Encoder(torch.nn.Module):
             r = self.projector(r)
         return r   
 
-def load_ckpt(ckpt_path, multi_chan=False, rep_dim=5, proj_dim=5, pos_enc='conseq', rep_after_proj=False, use_chan_pos=False, use_merge_layer=False, add_layernorm=False, half_embed_each=False, concat_pos=False):
+def load_ckpt(ckpt_path, multi_chan=False, block_size=1331, rep_dim=5, proj_dim=5, pos_enc='conseq', rep_after_proj=False, use_chan_pos=False, use_merge_layer=False, add_layernorm=False, half_embed_each=False, concat_pos=False):
     ckpt = torch.load(ckpt_path, map_location=torch.device('cpu'))
-    model = Encoder(multi_chan=multi_chan, rep_dim=rep_dim, proj_dim=proj_dim, pos_enc=pos_enc, rep_after_proj=rep_after_proj, use_chan_pos=use_chan_pos, use_merge_layer=use_merge_layer, add_layernorm=add_layernorm, half_embed_each=half_embed_each, concat_pos=concat_pos)
+    model = Encoder(multi_chan=multi_chan, block_size=block_size,rep_dim=rep_dim, proj_dim=proj_dim, pos_enc=pos_enc, rep_after_proj=rep_after_proj, use_chan_pos=use_chan_pos, use_merge_layer=use_merge_layer, add_layernorm=add_layernorm, half_embed_each=half_embed_each, concat_pos=concat_pos)
     if multi_chan:
         state_dict = {k.replace('module.', ''): v for k, v in ckpt['model'].items()}
         m, uek = model.load_state_dict(state_dict, strict=False)
@@ -62,9 +64,9 @@ def load_ckpt(ckpt_path, multi_chan=False, rep_dim=5, proj_dim=5, pos_enc='conse
     
     return model
 
-def get_dataloader(data_path, multi_chan=False, split='train', use_chan_pos=False):
+def get_dataloader(data_path, multi_chan=False, split='train', use_chan_pos=False, num_extra_chans=5):
     if multi_chan:
-        dataset = WFDataset_lab(data_path, split=split, multi_chan=True, use_chan_pos=use_chan_pos,transform=Crop(prob=0.0, num_extra_chans=5, ignore_chan_num=True))
+        dataset = WFDataset_lab(data_path, split=split, multi_chan=True, use_chan_pos=use_chan_pos,transform=Crop(prob=0.0, num_extra_chans=num_extra_chans, ignore_chan_num=True))
     else:
         print("Loading single channel data")
         dataset = WFDataset_lab(data_path, split=split, multi_chan=False)
@@ -75,21 +77,24 @@ def get_dataloader(data_path, multi_chan=False, split='train', use_chan_pos=Fals
     return loader
 
 
-def save_reps(model, loader, ckpt_path, split='train', multi_chan=False,rep_after_proj=False, use_chan_pos=False, suffix=''):
-    ckpt_root_dir = '/'.join(ckpt_path.split('/')[:-1])
+def save_reps(model, loader, ckpt_path, use_fc=False, split='train', multi_chan=False,rep_after_proj=False, use_chan_pos=False, suffix='', ckpt_root_dir=None):
+    if ckpt_root_dir is None:
+        ckpt_root_dir = '/'.join(ckpt_path.split('/')[:-1])
     model.eval()
     feature_bank = []
     with torch.no_grad():
         for data, target in loader:
+            
             if not multi_chan:
                 data = torch.squeeze(data, dim=1)
                 data = torch.unsqueeze(data, dim=-1)
             else:
                 if use_chan_pos:
                     data,chan_pos = data
-
-                data = data.view(-1, 11*121)
-                data = torch.unsqueeze(data, dim=-1)
+                
+                data = data.view(-1, data.shape[-2]*data.shape[-1])
+                if not use_fc:
+                    data = torch.unsqueeze(data, dim=-1)
             
             if use_chan_pos:
                 feature = model(data.cuda(non_blocking=True), chan_pos=chan_pos.cuda(non_blocking=True))

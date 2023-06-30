@@ -101,6 +101,9 @@ class SimCLR(object):
 
         # pca_score = knn_pca_score(self.args.out_dim, self.args.data)
         pca_score = 0
+        # test knn first
+        # knn_score = knn_monitor(net=self.model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True, args=self.args)
+        # print(f"my knn_acc:{knn_score}")
 
         for epoch_counter in range(self.start_epoch, self.args.epochs):
             if self.args.add_train:
@@ -183,6 +186,17 @@ class SimCLR(object):
                     knn_score = knn_monitor(net=self.model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True, args=self.args)
                     print(f"loss: {loss}, my knn_acc:{knn_score}")
                     self.logger.log_value('knn_score', knn_score, epoch_counter)
+                
+                save_dict = {
+                    'epoch': epoch_counter,
+                    'arch': self.args.arch,
+                    'optimizer': self.optimizer.state_dict(),
+                    'state_dict': self.model.state_dict()
+                    }
+                    
+                save_checkpoint(save_dict, is_best=False, filename=os.path.join(self.args.checkpoint_dir, f'checkpoint_epoch{epoch_counter}.pth'))
+                print(f"Model checkpoint and metadata has been saved at {self.args.checkpoint_dir}.")
+                logging.info(f"Model checkpoint and metadata has been saved at {self.args.checkpoint_dir}.")
                     
             if self.args.rank == 0 or not self.args.ddp:
                 logging.debug(f"Epoch: {epoch_counter}\tLoss: {loss}")
@@ -226,6 +240,7 @@ class SimCLR(object):
             logging.info(f"Model checkpoint and metadata has been saved at {self.args.checkpoint_dir}.")
         
             save_reps(self.model, test_loader, os.path.join(self.args.checkpoint_dir, 'final.pth'), split='test', multi_chan=False, rep_after_proj=True, use_chan_pos=False, suffix='')
-            save_reps(self.model, memory_loader, os.path.join(self.args.checkpoint_dir, 'final.pth'), split='test', multi_chan=False, rep_after_proj=True, use_chan_pos=False, suffix='')
+
+            save_reps(self.model, memory_loader, os.path.join(self.args.checkpoint_dir, 'final.pth'), split='train', multi_chan=False, rep_after_proj=True, use_chan_pos=False, suffix='')
             
             
