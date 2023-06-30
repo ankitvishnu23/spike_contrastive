@@ -267,7 +267,7 @@ class SimCLR(nn.Module):
                   use_chan_pos=args.use_chan_pos, n_extra_chans=num_extra_chans,
                   add_layernorm=args.add_layernorm, use_merge_layer=args.use_merge_layer,
                   half_embed_each=args.half_embed_each, remove_pos = args.remove_pos,
-                  concat_pos=args.concat_pos
+                  concat_pos=args.concat_pos, num_classes=args.num_classes
                   ) 
         gptconf = GPTConfig(**model_args)
         self.backbone = Multi_GPT(gptconf)
@@ -275,7 +275,7 @@ class SimCLR(nn.Module):
         
         # projector
         self.projector = Projector(rep_dim=gptconf.out_dim, proj_dim=gptconf.proj_dim)
-        self.online_head = nn.Linear(gptconf.out_dim, 10) # 10 classes
+        self.online_head = nn.Linear(gptconf.out_dim, gptconf.num_classes) # 10 classes
 
 
     def forward(self, y1, y2=None, labels=None, chan_pos=None, chan_pos2=None):
@@ -486,6 +486,7 @@ if __name__ == "__main__":
     parser.add_argument('--p_crop', default=0.5, type=float)
     parser.add_argument('--detected_spikes', action='store_true') # default = False
     parser.add_argument('--concat_pos', action='store_true') # default = False
+    parser.add_argument('--num_classes', default=10, type=int)
     
     
     args = parser.parse_args()
