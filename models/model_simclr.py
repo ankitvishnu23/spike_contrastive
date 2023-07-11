@@ -76,7 +76,7 @@ class Projector2(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, Lv=[200, 150, 100, 75], ks=[11, 21, 31], out_size = 2, proj_dim=5, fc_depth=2):
+    def __init__(self, Lv=[200, 150, 100, 75], ks=[11, 21, 31], out_size = 2, proj_dim=5, fc_depth=2, input_size=121):
         super(Encoder, self).__init__()
         print("init Encoder")
         self.proj_dim = out_size if out_size < proj_dim else proj_dim
@@ -126,7 +126,7 @@ class Encoder(nn.Module):
         return self
 
 class Encoder2(nn.Module):
-    def __init__(self, Lv=[64, 128, 256, 256, 256], ks=[11], out_size = 2, proj_dim=5, fc_depth=2):
+    def __init__(self, Lv=[64, 128, 256, 256, 256], ks=[11], out_size = 2, proj_dim=5, fc_depth=2, input_size=121):
         super(Encoder2, self).__init__()
         self.proj_dim = out_size if out_size < proj_dim else proj_dim
         self.enc_block1d = nn.Sequential(
@@ -175,24 +175,28 @@ class Encoder2(nn.Module):
         return x
 
 class FullyConnectedEnc(nn.Module):
-    def __init__(self, Lv=[121, 550, 1100, 250], out_size=2, proj_dim=5, fc_depth=2):
+    def __init__(self, input_size=121, Lv=[1024, 1024, 256], out_size=2, proj_dim=5, fc_depth=2, multichan=False):
         super(FullyConnectedEnc, self).__init__()
         self.proj_dim = out_size if out_size < proj_dim else proj_dim
+        self.input_size = input_size
+        self.multichan = multichan
 
         self.fcpart = nn.Sequential(
-            nn.Linear(Lv[0], Lv[1]),
+            nn.Linear(input_size, Lv[0]),
             nn.ReLU(),
             # nn.Dropout(p=0.2),
+            nn.Linear(Lv[0], Lv[1]),
+            nn.ReLU(),
             nn.Linear(Lv[1], Lv[2]),
             nn.ReLU(),
-            nn.Linear(Lv[2], Lv[3]),
-            nn.ReLU(),
-            nn.Linear(Lv[3], out_size),
+            nn.Linear(Lv[2], out_size),
             Projector(rep_dim=out_size, proj_dim=self.proj_dim)
             )
         self.Lv = Lv
 
     def forward(self, x):
+        if self.multichan:
+            x = x.view(-1, 1, self.input_size)
         x = self.fcpart(x)
         return x
 
@@ -659,15 +663,15 @@ model_dict = { "custom_encoder": Encoder,
 
 class ModelSimCLR(nn.Module):
 
-    def __init__(self, base_model, out_dim, proj_dim, fc_depth=2, expand_dim=16, ckpt=None, cls_head=None, multichan=True):
+    def __init__(self, base_model, out_dim, proj_dim, fc_depth=2, expand_dim=16, ckpt=None, cls_head=None, multichan=True, input_size=121):
         super(ModelSimCLR, self).__init__()
         
-        base_model += '_multichan' if multichan else ''
+        base_model += '_multichan' if multichan and 'attention' in base_model else ''
 
         if "attention" in base_model:
             self.backbone = model_dict[base_model](out_size=out_dim, proj_dim=proj_dim, fc_depth=fc_depth, expand_dim=expand_dim, cls_head=cls_head)
         else:
-            self.backbone = model_dict[base_model](out_size=out_dim, proj_dim=proj_dim, fc_depth=fc_depth)
+            self.backbone = model_dict[base_model](out_size=out_dim, proj_dim=proj_dim, fc_depth=fc_depth, input_size=input_size, multichan=multichan)
 
         # self.backbone = self._get_basemodel(base_model)
         print("number of encoder params: ", sum(p.numel() for p in self.backbone.parameters()))

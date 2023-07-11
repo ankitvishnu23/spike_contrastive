@@ -138,7 +138,10 @@ class SimCLR(object):
                     if self.args.online_head:
                         features, cls_loss, online_acc = self.model(wf, lab, chan_pos=chan_pos)
                     else:
-                        features = self.model(wf, chan_pos=chan_pos)
+                        if self.args.use_gpt:
+                            features = self.model(wf, chan_pos=chan_pos)
+                        else:
+                            features = self.model(wf)
                         cls_loss = 0.
                         online_acc = -1
                     if self.proj is not None:
@@ -180,8 +183,8 @@ class SimCLR(object):
                 if self.args.rank == 0 or not self.args.ddp:
                     # knn_score = validation(self.model, self.args.out_dim, self.args.data, self.gpu)
                     # print(f"loss: {loss}, knn_acc:{knn_score}")
-                    knn_score = knn_monitor(net=self.model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True, args=args)
-                    gmm_score = gmm_monitor(net=self.model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda', hide_progress=True, args=args)
+                    knn_score = knn_monitor(net=self.model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda',k=200, hide_progress=True, args=self.args)
+                    gmm_score = gmm_monitor(net=self.model, memory_data_loader=memory_loader, test_data_loader=test_loader, device='cuda', epoch_num=epoch_counter, hide_progress=True, args=self.args)
                     print(f"Epoch {epoch_counter}, my knn_acc:{knn_score}")
                     print(f"Epoch {epoch_counter}, my gmm_acc:{gmm_score}")
                     self.logger.log_value('knn_acc', knn_score, epoch_counter)

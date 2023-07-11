@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 import torch.distributed as dist
 from classy_vision.generic.distributed_util import (
     convert_to_distributed_tensor,
@@ -131,7 +132,7 @@ def knn_predict(feature, feature_bank, feature_labels, classes, knn_k, knn_t):
 
 
 # GMM fitting to data for validation
-def gmm_monitor(net, memory_data_loader, test_data_loader, device='cuda', hide_progress=False,
+def gmm_monitor(net, memory_data_loader, test_data_loader, device='cuda', hide_progress=False, epoch_num=0,
                 targets=None, args=None):
     if not targets:
         targets = memory_data_loader.dataset.targets
@@ -139,15 +140,27 @@ def gmm_monitor(net, memory_data_loader, test_data_loader, device='cuda', hide_p
     net.eval()
     classes = test_data_loader.dataset.num_classes
 
-    # covariance_type : {'full', 'tied', 'diag', 'spherical'}
-    covariance_type = 'full'
-    reps_train, labels_train = get_torch_reps(net, memory_data_loader, device, args)
-    reps_test, labels_test = get_torch_reps(net, test_data_loader, device, args)
-    gmm = GaussianMixture(classes, 
-                        random_state=0, 
-                        covariance_type=covariance_type).fit(reps_train)
-    gmm_cont_test_labels = gmm.predict(reps_test)
-    score = adjusted_rand_score(labels_test, gmm_cont_test_labels)*100
+    num_iters = 50 if epoch_num == args.epochs-1 else 1
+
+    scores = []
+    for i in range(num_iters):
+        # covariance_type : {'full', 'tied', 'diag', 'spherical'}
+        covariance_type = 'full'
+        reps_train, labels_train = get_torch_reps(net, memory_data_loader, device, args)
+        reps_test, labels_test = get_torch_reps(net, test_data_loader, device, args)
+        gmm = GaussianMixture(classes,
+                            random_state=random.randint(0, 1000000),
+                            covariance_type=covariance_type).fit(reps_train)
+        gmm_cont_test_labels = gmm.predict(reps_test)
+        curr_score = adjusted_rand_score(labels_test, gmm_cont_test_labels)*100
+        scores.append(curr_score)
+        if i == 49:
+           print("max gmm score: {}".format(max(scores)))
+           print("min gmm score: {}".format(min(scores)))
+           print("50 run gmm mean score: {}".format(np.mean(scores)))
+           print("50 run gmm std-dev score: {}".format(np.std(scores)))
+
+    score = np.mean(scores)
 
     return score
 
@@ -159,14 +172,16 @@ def knn_monitor(net, memory_data_loader, test_data_loader, device='cuda', k=200,
         targets = memory_data_loader.dataset.targets
 
     net.eval()
+    classes = test_data_loader.dataset.num_classes
     # classes = len(memory_data_loader.dataset.classes)
     total_top1, total_top5, total_num, feature_bank = 0.0, 0.0, 0, []
     with torch.no_grad():
         # generate feature bank
         for data, target in memory_data_loader:
             if not args.multi_chan:
-                data = torch.squeeze(data, dim=1)
-                data = torch.unsqueeze(data, dim=-1)
+                if args.use_gpt:
+                    data = torch.squeeze(data, dim=1)
+                    data = torch.unsqueeze(data, dim=-1)
             else:
                 if args.use_chan_pos:
                     data, chan_pos = data

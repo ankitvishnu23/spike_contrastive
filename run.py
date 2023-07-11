@@ -93,15 +93,24 @@ def main_worker(gpu, args):
 
     # define memory and test dataset for knn monitoring
     if not args.ddp and not args.no_knn:
-        memory_dataset = WFDataset_lab(args.data, split='train', multi_chan=args.multi_chan)
-        memory_loader = torch.utils.data.DataLoader(
-            memory_dataset, batch_size=args.batch_size, shuffle=False,
-            num_workers=args.workers, pin_memory=True, drop_last=False)
-        
-        test_dataset = WFDataset_lab(args.data, split=args.test_split, multi_chan=args.multi_chan)
-        test_loader = torch.utils.data.DataLoader(
-            test_dataset, batch_size=args.batch_size, shuffle=False,
-            num_workers=args.workers, pin_memory=True, drop_last=False)
+        if args.multi_chan:
+            memory_dataset = WFDataset_lab(args.data, split='train', multi_chan=args.multi_chan, transform=Crop(prob=0.0, num_extra_chans=num_extra_chans, ignore_chan_num=True), use_chan_pos=args.use_chan_pos)
+            memory_loader = torch.utils.data.DataLoader(
+                memory_dataset, batch_size=128, shuffle=False,
+                num_workers=args.workers, pin_memory=True, drop_last=False)
+            test_dataset = WFDataset_lab(args.data, split='test', multi_chan=args.multi_chan, transform=Crop(prob=0.0, num_extra_chans=num_extra_chans, ignore_chan_num=True), use_chan_pos=args.use_chan_pos)
+            test_loader = torch.utils.data.DataLoader(
+                test_dataset, batch_size=args.batch_size, shuffle=False,
+                num_workers=args.workers, pin_memory=True, drop_last=False)
+        else:
+            memory_dataset = WFDataset_lab(args.data, split='train', multi_chan=False)
+            memory_loader = torch.utils.data.DataLoader(
+                memory_dataset, batch_size=128, shuffle=False,
+                num_workers=args.workers, pin_memory=True, drop_last=False)
+            test_dataset = WFDataset_lab(args.data, split='test', multi_chan=False)
+            test_loader = torch.utils.data.DataLoader(
+                test_dataset, batch_size=args.batch_size, shuffle=False,
+                num_workers=args.workers, pin_memory=True, drop_last=False)
     else:
         memory_loader = None
         test_loader = None
@@ -114,7 +123,7 @@ def main_worker(gpu, args):
         model = Single_GPT(gptconf).cuda(gpu)
     else:
         model = ModelSimCLR(base_model=args.arch, out_dim=args.out_dim, proj_dim=args.proj_dim, \
-            fc_depth=args.fc_depth, expand_dim=args.expand_dim, multichan=args.multi_chan).cuda(gpu)
+            fc_depth=args.fc_depth, expand_dim=args.expand_dim, multichan=args.multi_chan, input_size=(2*num_extra_chans+1)*121).cuda(gpu)
 
     if not args.no_proj:
         if args.arch == 'custom_encoder':
@@ -160,7 +169,7 @@ def main_worker(gpu, args):
     else:
         start_epoch = 0
         
-    #  It’s a no-op if the 'gpu_index' argument is a negative integer or None.
+    # It’s a no-op if the 'gpu_index' argument is a negative integer or None.
     # with torch.cuda.device(args.gpu_index):
     print("starting SimCLR..")
     
