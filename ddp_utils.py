@@ -192,7 +192,7 @@ def knn_monitor(net, memory_data_loader, test_data_loader, device='cuda', k=200,
                 feature = net(data.to(device=device, non_blocking=True), chan_pos=chan_pos.to(device=device, non_blocking=True))
             else:
                 feature = net(data.to(device=device, non_blocking=True))
-            
+            feature = torch.squeeze(feature)
             feature = F.normalize(feature, dim=1)
             feature_bank.append(feature)
         # [D, N]
@@ -219,7 +219,7 @@ def knn_monitor(net, memory_data_loader, test_data_loader, device='cuda', k=200,
                 feature = net(data.to(device=device, non_blocking=True), chan_pos=chan_pos.to(device=device, non_blocking=True))
             else:
                 feature = net(data.to(device=device, non_blocking=True))
-
+            feature = torch.squeeze(feature)
             feature = F.normalize(feature, dim=1)
 
             pred_labels = knn_predict(feature, feature_bank, feature_labels, classes, k, t)
