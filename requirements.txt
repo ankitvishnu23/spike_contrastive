@@ -1,4 +1,4 @@
-torch 
---extra-index-url https://download.pytorch.org/whl/cu116
+torch==1.11.0+cu113
+--extra-index-url https://download.pytorch.org/whl/cu113
 
 -e .
