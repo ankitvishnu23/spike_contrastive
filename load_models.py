@@ -5,14 +5,14 @@ from data_aug.wf_data_augs import Crop
 import os
 
 class Encoder(torch.nn.Module):
-    def __init__(self, multi_chan = False, rep_dim=5, proj_dim=5, block_size=1331,pos_enc='conseq', rep_after_proj=False, use_chan_pos=False, use_merge_layer=False, add_layernorm=False, half_embed_each=False, concat_pos=False):
+    def __init__(self, multi_chan = False, rep_dim=5, n_extra_chans=2,proj_dim=5, block_size=1331,pos_enc='conseq', rep_after_proj=False, use_chan_pos=False, use_merge_layer=False, add_layernorm=False, half_embed_each=False, concat_pos=False):
         super().__init__()
         if multi_chan:
             # if concat_pos:
             # model_args = dict(bias=False, block_size=block_size, n_layer=20, n_head =4, n_embd=64, dropout=0.2, out_dim=rep_dim, proj_dim=proj_dim, is_causal=True, pos = pos_enc, multi_chan=True, use_chan_pos=use_chan_pos, use_merge_layer=use_merge_layer, add_layernorm=add_layernorm, half_embed_each=half_embed_each, concat_pos=concat_pos)
             # else:    
                 # model_args = dict(bias=False, block_size=1331, n_layer=20, n_head =4, n_embd=64, dropout=0.2, out_dim=rep_dim, proj_dim=proj_dim, is_causal=True, pos = pos_enc, multi_chan=True, use_chan_pos=use_chan_pos, use_merge_layer=use_merge_layer, add_layernorm=add_layernorm, half_embed_each=half_embed_each, concat_pos=concat_pos)
-            model_args = dict(n_extra_chans=2,bias=False, block_size=block_size, n_layer=20, n_head =4, n_embd=64, dropout=0.2, out_dim=rep_dim, proj_dim=proj_dim, is_causal=True, pos = pos_enc, multi_chan=True, use_chan_pos=use_chan_pos, use_merge_layer=use_merge_layer, add_layernorm=add_layernorm, half_embed_each=half_embed_each, concat_pos=concat_pos)
+            model_args = dict(n_extra_chans=n_extra_chans,bias=False, block_size=block_size, n_layer=20, n_head =4, n_embd=64, dropout=0.2, out_dim=rep_dim, proj_dim=proj_dim, is_causal=True, pos = pos_enc, multi_chan=True, use_chan_pos=use_chan_pos, use_merge_layer=use_merge_layer, add_layernorm=add_layernorm, half_embed_each=half_embed_each, concat_pos=concat_pos)
         
         else:
             model_args = dict(bias=False, block_size=121, n_layer=20, n_head =4, n_embd=32, dropout=0.2, out_dim=rep_dim, proj_dim=proj_dim, is_causal=True, pos = pos_enc, multi_chan=False)
@@ -36,9 +36,9 @@ class Encoder(torch.nn.Module):
             r = self.projector(r)
         return r   
 
-def load_ckpt(ckpt_path, multi_chan=False, block_size=1331, rep_dim=5, proj_dim=5, pos_enc='conseq', rep_after_proj=False, use_chan_pos=False, use_merge_layer=False, add_layernorm=False, half_embed_each=False, concat_pos=False):
+def load_ckpt(ckpt_path, multi_chan=False, n_extra_chans=2, block_size=1331, rep_dim=5, proj_dim=5, pos_enc='conseq', rep_after_proj=False, use_chan_pos=False, use_merge_layer=False, add_layernorm=False, half_embed_each=False, concat_pos=False):
     ckpt = torch.load(ckpt_path, map_location=torch.device('cpu'))
-    model = Encoder(multi_chan=multi_chan, block_size=block_size,rep_dim=rep_dim, proj_dim=proj_dim, pos_enc=pos_enc, rep_after_proj=rep_after_proj, use_chan_pos=use_chan_pos, use_merge_layer=use_merge_layer, add_layernorm=add_layernorm, half_embed_each=half_embed_each, concat_pos=concat_pos)
+    model = Encoder(multi_chan=multi_chan, n_extra_chans=n_extra_chans, block_size=block_size,rep_dim=rep_dim, proj_dim=proj_dim, pos_enc=pos_enc, rep_after_proj=rep_after_proj, use_chan_pos=use_chan_pos, use_merge_layer=use_merge_layer, add_layernorm=add_layernorm, half_embed_each=half_embed_each, concat_pos=concat_pos)
     if multi_chan:
         state_dict = {k.replace('module.', ''): v for k, v in ckpt['model'].items()}
         m, uek = model.load_state_dict(state_dict, strict=False)

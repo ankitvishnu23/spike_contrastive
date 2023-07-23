@@ -9,6 +9,9 @@ import random
 from PIL import Image, ImageOps, ImageFilter
 import torch.nn.functional as F
 import sys
+from utils import get_torch_reps
+from sklearn.mixture import GaussianMixture
+from sklearn.metrics import adjusted_rand_score
 
 class GatherLayer(torch.autograd.Function):
     """
@@ -191,41 +194,22 @@ def knn_monitor(net, memory_data_loader, test_data_loader, use_fc=False, device=
             total_top1 += (pred_labels[:, 0] == target).float().sum().item()
     return total_top1 / total_num * 100
 
-
-def get_torch_reps(net, data_loader, device, args):
-    feature_bank = []
-    feature_labels = []
-    with torch.no_grad():
-        # generate feature bank
-        for data, target in data_loader:
-            if args.use_gpt:
-                feature = net(data.to(device=device, non_blocking=True).unsqueeze(dim=-1))
-            else:
-                feature = net(data.to(device=device, non_blocking=True).unsqueeze(dim=1))
-            feature = F.normalize(feature, dim=1)
-            feature_bank.append(feature)
-            feature_labels.append(target)
-        # [D, N]
-        feature_bank = torch.cat(feature_bank, dim=0).contiguous()
-        # [N]
-        feature_labels = torch.cat(torch.tensor(feature_labels, device=feature_bank.device), dim=0)
-
-    return feature_bank, feature_labels
-
+# GMM fitting to data for validation
 def gmm_monitor(net, memory_data_loader, test_data_loader, device='cuda', hide_progress=False,
                 targets=None, args=None):
     if not targets:
         targets = memory_data_loader.dataset.targets
 
     net.eval()
-    classes = test_data_loader.num_classes
+    # classes = test_data_loader.dataset.num_classes
+    classes = args.num_classes
 
     # covariance_type : {'full', 'tied', 'diag', 'spherical'}
     covariance_type = 'full'
     reps_train, labels_train = get_torch_reps(net, memory_data_loader, device, args)
     reps_test, labels_test = get_torch_reps(net, test_data_loader, device, args)
     gmm = GaussianMixture(classes, 
-                        random_state=0, 
+                        random_state=args.random_state, 
                         covariance_type=covariance_type).fit(reps_train)
     gmm_cont_test_labels = gmm.predict(reps_test)
     score = adjusted_rand_score(labels_test, gmm_cont_test_labels)*100

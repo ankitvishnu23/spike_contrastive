@@ -301,3 +301,32 @@ def save_reps(model, loader, ckpt_path, num_chan=11, use_fc=False, split='train'
         else:
             torch.save(feature_bank, os.path.join(ckpt_root_dir, f'{split}_reps{suffix}.pt'))
             print(f"saved {split} features to {ckpt_root_dir}/{split}_reps{suffix}.pt")
+            
+def get_torch_reps(net, data_loader, device, args):
+    feature_bank = []
+    feature_labels = torch.tensor([])
+    with torch.no_grad():
+        # generate feature bank
+        for data, target in data_loader:
+            if args.use_chan_pos:
+                data, chan_pos = data
+            else:
+                chan_pos = None
+                
+            if args.use_gpt:
+                data = data.view(-1, (args.num_extra_chans*2+1)*121) if args.multi_chan else torch.squeeze(data, dim=1)
+                if args.use_chan_pos:
+                    feature = net(data.to(device=device, non_blocking=True).unsqueeze(dim=-1), chan_pos=chan_pos.to(device=device, non_blocking=True))
+                else:
+                    feature = net(data.to(device=device, non_blocking=True).unsqueeze(dim=-1))
+            else:
+                feature = net(data.to(device=device, non_blocking=True))
+            feature = F.normalize(feature, dim=1)
+            feature_bank.append(feature)
+            feature_labels = torch.cat((feature_labels, target))
+        # [D, N]
+        feature_bank = torch.cat(feature_bank, dim=0).cpu().numpy()
+        # [N]
+        feature_labels = feature_labels.cpu().numpy()
+    
+    return feature_bank, feature_labels
