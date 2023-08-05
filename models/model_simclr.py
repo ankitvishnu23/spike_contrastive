@@ -210,6 +210,110 @@ class FullyConnectedEnc(nn.Module):
             new_state_dict[new_key] = state_dict[key]
         self.load_state_dict(new_state_dict)
         return self
+    
+
+# (c) All rights reserved. ECOLE POLYTECHNIQUE FÉDÉRALE DE LAUSANNE,
+# Switzerland, Laboratory of Prof. Mackenzie W. Mathis (UPMWMATHIS) and
+# original authors: Steffen Schneider, Jin H Lee, Mackenzie W Mathis. 2023.
+#
+# Source code:
+# https://github.com/AdaptiveMotorControlLab/CEBRA
+class _Norm(nn.Module):
+
+    def forward(self, inp: torch.Tensor) -> torch.Tensor:
+        return inp / torch.norm(inp, dim=1, keepdim=True)
+    
+
+class Squeeze(nn.Module):
+    """Squeeze 3rd dimension of input tensor, pass through otherwise."""
+
+    def forward(self, inp: torch.Tensor) -> torch.Tensor:
+        """Squeeze 3rd dimension of input tensor, pass through otherwise.
+
+        Args:
+            inp: 1-3D input tensor
+
+        Returns:
+            If the third dimension of the input tensor can be squeezed,
+            return the resulting 2D output tensor. If input is 2D or less,
+            return the input.
+        """
+        if inp.dim() > 2:
+            return inp.squeeze(2)
+        return inp
+
+    
+class _Skip(nn.Module):
+    """Add a skip connection to a list of modules
+
+    Args:
+        *modules (torch.nn.Module): Modules to add to the bottleneck
+        crop (tuple of ints): Number of timesteps to crop around the
+            shortcut of the module to match the output with the bottleneck
+            layers. This can be typically inferred from the strides/sizes
+            of any conv layers within the bottleneck.
+    """
+
+    def __init__(self, *modules, crop=(1, 1)):
+        super().__init__()
+        self.module = nn.Sequential(*modules)
+        self.crop = slice(
+            crop[0],
+            -crop[1] if isinstance(crop[1], int) and crop[1] > 0 else None)
+
+    def forward(self, inp: torch.Tensor) -> torch.Tensor:
+        """Compute forward pass through the skip connection.
+
+        Implements the operation ``self.module(inp[..., self.crop]) + skip``.
+
+        Args:
+            inp: 3D input tensor
+
+        Returns:
+            3D output tensor of same dimension as `inp`.
+        """
+        skip = self.module(inp)
+        return inp[..., self.crop] + skip
+
+
+class CEBRA(nn.Module):
+    def __init__(self, num_units=32, out_size = 2, proj_dim=5, fc_depth=2, input_size=121, multichan=False):
+        super(Encoder, self).__init__()
+        print("init CEBRA Encoder")
+        self.proj_dim = out_size if out_size < proj_dim else proj_dim
+        self.multichan = multichan
+        self.input_size = input_size
+        self.enc_block1d = nn.Sequential(
+            nn.Conv1d(in_channels=self.input_size, out_channels=num_units, kernel_size=2),
+            nn.GELU(),
+            _Skip(nn.Conv1d(num_units, num_units, 3), nn.GELU()),
+            _Skip(nn.Conv1d(num_units, num_units, 3), nn.GELU()),
+            _Skip(nn.Conv1d(num_units, num_units, 3), nn.GELU()),
+            nn.Conv1d(in_channels=num_units, out_channels=out_size, kernel_size=3),
+            _Norm(),
+            Squeeze(),
+        )
+
+        self.projector = Projector(rep_dim=out_size, proj_dim=self.proj_dim)
+
+    def forward(self, x):
+        if self.multichan:
+            x = x.view(-1, 1, self.input_size)
+        x = self.enc_block1d(x)
+        x = self.projector(x)
+        return x
+
+    def load(self, fname_model):
+        checkpoint = torch.load(fname_model, map_location="cpu")
+        state_dict = checkpoint["state_dict"]
+        new_state_dict = OrderedDict()
+        for key in state_dict:
+            # if "backbone" in key and "fc" not in key:
+            new_key = '.'.join(key.split('.')[1:])
+            new_state_dict[new_key] = state_dict[key]
+        self.load_state_dict(new_state_dict)
+        return self
+    
 
 class PositionalEncoding(nn.Module):
 
