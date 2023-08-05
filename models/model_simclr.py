@@ -761,6 +761,7 @@ model_dict = { "custom_encoder": Encoder,
                             "fc_encoder": FullyConnectedEnc,
                             "attention": AttentionEnc,
                             "attention_multichan": MultiChanAttentionEnc1,
+                            'cebra': CEBRA,
                             # "resnet18": models.resnet18(pretrained=False, num_classes=out_dim),
                             # "resnet50": models.resnet50(pretrained=False, num_classes=out_dim)
                             }
