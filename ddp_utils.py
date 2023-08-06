@@ -205,8 +205,9 @@ def knn_monitor(net, memory_data_loader, test_data_loader, device='cuda', k=200,
             
             target = target.to(device=device, non_blocking=True)
             if not args.multi_chan:
-                data = torch.squeeze(data, dim=1)
-                data = torch.unsqueeze(data, dim=-1)
+                if args.use_gpt:
+                    data = torch.squeeze(data, dim=1)
+                    data = torch.unsqueeze(data, dim=-1)
             else:
                 if args.use_chan_pos:
                     data, chan_pos = data

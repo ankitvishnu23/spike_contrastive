@@ -278,13 +278,16 @@ class _Skip(nn.Module):
 
 class CEBRA(nn.Module):
     def __init__(self, num_units=32, out_size = 2, proj_dim=5, fc_depth=2, input_size=121, multichan=False):
-        super(Encoder, self).__init__()
+        super(CEBRA, self).__init__()
         print("init CEBRA Encoder")
         self.proj_dim = out_size if out_size < proj_dim else proj_dim
+        self.out_size = out_size
         self.multichan = multichan
         self.input_size = input_size
+        self.num_chans = input_size // 121
+        
         self.enc_block1d = nn.Sequential(
-            nn.Conv1d(in_channels=self.input_size, out_channels=num_units, kernel_size=2),
+            nn.Conv1d(in_channels=self.num_chans, out_channels=num_units, kernel_size=2),
             nn.GELU(),
             _Skip(nn.Conv1d(num_units, num_units, 3), nn.GELU()),
             _Skip(nn.Conv1d(num_units, num_units, 3), nn.GELU()),
@@ -294,12 +297,13 @@ class CEBRA(nn.Module):
             Squeeze(),
         )
 
-        self.projector = Projector(rep_dim=out_size, proj_dim=self.proj_dim)
+        self.projector = Projector(rep_dim=self.out_size*112, proj_dim=self.proj_dim)
 
     def forward(self, x):
         if self.multichan:
-            x = x.view(-1, 1, self.input_size)
+            x = x.view(-1, self.num_chans, 121)
         x = self.enc_block1d(x)
+        x = x.view(-1, self.out_size * x.shape[2])
         x = self.projector(x)
         return x
 
@@ -761,6 +765,7 @@ model_dict = { "custom_encoder": Encoder,
                             "fc_encoder": FullyConnectedEnc,
                             "attention": AttentionEnc,
                             "attention_multichan": MultiChanAttentionEnc1,
+                            "cebra": CEBRA,
                             # "resnet18": models.resnet18(pretrained=False, num_classes=out_dim),
                             # "resnet50": models.resnet50(pretrained=False, num_classes=out_dim)
                             }

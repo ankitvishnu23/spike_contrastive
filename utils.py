@@ -156,6 +156,7 @@ def get_torch_reps(net, data_loader, device, args):
             else:
                 feature = net(data.to(device=device, non_blocking=True))
                 feature = torch.squeeze(feature)
+
             feature = F.normalize(feature, dim=1)
             feature_bank.append(feature)
             feature_labels = torch.cat((feature_labels, target))

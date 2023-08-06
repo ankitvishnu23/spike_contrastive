@@ -2,7 +2,7 @@ from __future__ import print_function, division
 from array import array
 import os
 import math
-import pandas as pd
+#import pandas as pd
 import numpy as np
 import scipy as sp
 # from skimage import io, transform
