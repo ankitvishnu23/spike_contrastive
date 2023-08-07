@@ -94,15 +94,15 @@ class SmartNoise(object):
     temporal_name = 'temporal_cov_example.npy'
     spatial_name = 'spatial_cov_example.npy'
 
-    def __init__(self, root_folder=None, temporal_cov=None, spatial_cov=None, noise_scale=1.0, normalize=False):
+    def __init__(self, root_folder=None, temporal_cov=None, spatial_cov=None, noise_scale=1.0, normalize=False, gpu=0):
         if root_folder is not None:
             self.root_folder = root_folder
         if temporal_cov is None:
-            temporal_cov = np.load(os.path.join(self.root_folder, self.temporal_name))
+            temporal_cov = torch.from_numpy(np.load(os.path.join(self.root_folder, self.temporal_name))).cuda(gpu,non_blocking=True)
         if spatial_cov is None:
-            spatial_cov = np.load(os.path.join(self.root_folder + self.spatial_name))
-        self.temporal_cov = temporal_cov
-        self.spatial_cov = spatial_cov
+            spatial_cov = torch.from_numpy(np.load(os.path.join(self.root_folder, self.spatial_name))).cuda(gpu,non_blocking=True)
+        self.temporal_cov = torch.from_numpy(temporal_cov).cuda(gpu,non_blocking=True)
+        self.spatial_cov = torch.from_numpy(spatial_cov).cuda(gpu,non_blocking=True)
         # self.noise_scale = np.float64(noise_scale)
         self.noise_scale = np.float32(noise_scale)
         self.normalize = normalize
@@ -132,19 +132,23 @@ class SmartNoise(object):
             chan_nums[chan_nums < 0] = 0
         chan_nums = chan_nums.astype(int) # sometimes chan_nums is a float
 
-        noise = np.random.normal(size=(waveform_length, n_chans))
+        # noise = np.random.normal(size=(waveform_length, n_chans_total))
+        noise = torch.cuda.randn(size=(waveform_length, n_chans_total))
 
-        noise = np.reshape(np.matmul(noise, self.spatial_cov),
-                        (waveform_length, n_chans_total))[:, chan_nums]
+        # noise = np.reshape(np.matmul(noise, self.spatial_cov),
+        #                 (waveform_length, n_chans_total))[:, chan_nums]
+        noise = torch.matmul(noise, self.spatial_cov).view((waveform_length, n_chans_total))[:, chan_nums]
 
-        the_noise = np.reshape(np.matmul(noise.T, self.temporal_cov).T, (-1, n_chans))
+        # the_noise = np.reshape(np.matmul(noise.T, self.temporal_cov).T, (-1, n_chans))
+        the_noise = torch.matmul(noise.T, self.temporal_cov).view(n_chans, -1)
 
         # the_noise = np.reshape(np.matmul(reshaped_noise, self.spatial_cov),
         #                 (waveform_length, n_chans_total))
         
         # noise_start = np.random.choice(n_chans_total - n_chans)
             
-        noise_to_add = the_noise.T
+        # noise_to_add = the_noise.T
+        noise_to_add = the_noise.cpu().numpy()
         noise_to_add = self.normalize_wf(noise_to_add) if self.normalize else noise_to_add
         
         # noise_to_add = self.normalize_wf(the_noise[:, chan_nums].T) if self.normalize else the_noise[:, chan_nums].T
