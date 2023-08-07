@@ -127,21 +127,24 @@ class SmartNoise(object):
         n_chans_total, _ = self.spatial_cov.shape
         waveform_length, _ = self.temporal_cov.shape
 
-        noise = np.random.normal(size=(waveform_length, n_chans_total))
-
-        noise = np.matmul(noise.T, self.temporal_cov).T
-        reshaped_noise = np.reshape(noise, (-1, n_chans_total))
-
-        the_noise = np.reshape(np.matmul(reshaped_noise, self.spatial_cov),
-                        (waveform_length, n_chans_total))
-        
-        # noise_start = np.random.choice(n_chans_total - n_chans)
         if type(chan_nums) != np.int64: 
             chan_nums[chan_nums > n_chans_total-1] = n_chans_total - 1
             chan_nums[chan_nums < 0] = 0
-            
         chan_nums = chan_nums.astype(int) # sometimes chan_nums is a float
-        noise_to_add = the_noise[:, chan_nums].T
+
+        noise = np.random.normal(size=(waveform_length, n_chans))
+
+        noise = np.reshape(np.matmul(noise, self.spatial_cov),
+                        (waveform_length, n_chans_total))[:, chan_nums]
+
+        the_noise = np.reshape(np.matmul(noise.T, self.temporal_cov).T, (-1, n_chans))
+
+        # the_noise = np.reshape(np.matmul(reshaped_noise, self.spatial_cov),
+        #                 (waveform_length, n_chans_total))
+        
+        # noise_start = np.random.choice(n_chans_total - n_chans)
+            
+        noise_to_add = the_noise.T
         noise_to_add = self.normalize_wf(noise_to_add) if self.normalize else noise_to_add
         
         # noise_to_add = self.normalize_wf(the_noise[:, chan_nums].T) if self.normalize else the_noise[:, chan_nums].T

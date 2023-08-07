@@ -177,7 +177,7 @@ class SimCLR(object):
 
                 # warmup for the first 10 epochs
                 if epoch_counter >= 10 and self.scheduler != None:
-                    self.scheduler.step()   
+                    self.scheduler.step()
             
             if epoch_counter % self.args.eval_knn_every_n_epochs == 0 and epoch_counter != 0 and not self.args.no_knn:
                 if self.args.rank == 0 or not self.args.ddp:

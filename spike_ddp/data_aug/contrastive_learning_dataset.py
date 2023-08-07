@@ -135,6 +135,11 @@ class WFDataset_lab(Dataset):
             self.data = np.load(os.path.join(root, self.filename)).astype('float32')
             self.targets = np.array([[i for j in range(1200)] \
                                 for i in range(10)]).reshape(-1).astype('long')
+        elif split == 'val':
+            self.filename = "spikes_val.npy"
+            self.data = np.load(os.path.join(root, self.filename)).astype('float32')
+            self.targets = np.array([[i for j in range(300)] \
+                                for i in range(10)]).reshape(-1).astype('long')
         elif split == 'test':
             self.filename = "spikes_test.npy"
             self.data = np.load(os.path.join(root, self.filename)).astype('float32')

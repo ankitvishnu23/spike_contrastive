@@ -11,7 +11,6 @@ install_requires = [
     "opencv-python",
     "pandas",
     "pillow",
-    "lightning",
     "scikit-image",
     "sklearn",
     "tensorboard_logger",
