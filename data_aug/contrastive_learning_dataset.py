@@ -12,6 +12,7 @@ from data_aug.view_generator import ContrastiveLearningViewGenerator, LabelViewG
 from data_aug.wf_data_augs import AmpJitter, Jitter, Collide, SmartNoise, ToWfTensor, PCA_Reproj, Crop
 from typing import Any, Callable, Optional, Tuple
 
+
 class WFDataset(Dataset):
     train_set_fn = "spikes_train.npy"
     spike_mcs_fn = "channel_num_train.npy"
@@ -93,7 +94,7 @@ class WF_MultiChan_Dataset(Dataset):
     def __init__(
         self,
         root: str,
-        use_chan_pos: bool = False, 
+        use_chan_pos: bool = False,
         transform: Optional[Callable] = None,
         target_transform: Optional[Callable] = None,
         detected_spikes: bool = False
@@ -144,6 +145,8 @@ class WF_MultiChan_Dataset(Dataset):
             wf, chan_loc = self.transform([wf, chan_nums, chan_loc])
         elif self.transform is not None:
             wf = self.transform([wf, chan_nums])
+            # wf = [ret_obj[0][0], ret_obj[1][0]]
+            # chan_nums = [ret_obj[0][1], ret_obj[1][1]]
 
         if self.target_transform is not None:
             y = self.target_transform(y)

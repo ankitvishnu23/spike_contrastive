@@ -11,7 +11,6 @@ from sklearn.decomposition import PCA
 import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
-from torchvision import transforms, utils
 from torch.distributions.uniform import Uniform
 from torch.distributions.multivariate_normal import MultivariateNormal
 from torch.distributions.bernoulli import Bernoulli
@@ -94,15 +93,15 @@ class SmartNoise(object):
     temporal_name = 'temporal_cov_example.npy'
     spatial_name = 'spatial_cov_example.npy'
 
-    def __init__(self, root_folder=None, temporal_cov=None, spatial_cov=None, noise_scale=1.0, normalize=False, gpu=0):
+    def __init__(self, root_folder=None, temporal_cov=None, spatial_cov=None, noise_scale=1.0, normalize=False):
         if root_folder is not None:
             self.root_folder = root_folder
         if temporal_cov is None:
-            temporal_cov = torch.from_numpy(np.load(os.path.join(self.root_folder, self.temporal_name))).cuda(gpu,non_blocking=True)
+            temporal_cov = (np.load(os.path.join(self.root_folder, self.temporal_name)))
         if spatial_cov is None:
-            spatial_cov = torch.from_numpy(np.load(os.path.join(self.root_folder, self.spatial_name))).cuda(gpu,non_blocking=True)
-        self.temporal_cov = torch.from_numpy(temporal_cov).cuda(gpu,non_blocking=True)
-        self.spatial_cov = torch.from_numpy(spatial_cov).cuda(gpu,non_blocking=True)
+            spatial_cov = np.load(os.path.join(self.root_folder, self.spatial_name))
+        self.temporal_cov = temporal_cov
+        self.spatial_cov = spatial_cov
         # self.noise_scale = np.float64(noise_scale)
         self.noise_scale = np.float32(noise_scale)
         self.normalize = normalize
@@ -132,23 +131,17 @@ class SmartNoise(object):
             chan_nums[chan_nums < 0] = 0
         chan_nums = chan_nums.astype(int) # sometimes chan_nums is a float
 
-        # noise = np.random.normal(size=(waveform_length, n_chans_total))
-        noise = torch.cuda.randn(size=(waveform_length, n_chans_total))
+        noise = np.random.normal(size=(waveform_length, n_chans_total))
 
-        # noise = np.reshape(np.matmul(noise, self.spatial_cov),
-        #                 (waveform_length, n_chans_total))[:, chan_nums]
-        noise = torch.matmul(noise, self.spatial_cov).view((waveform_length, n_chans_total))[:, chan_nums]
+        noise = np.reshape(np.matmul(noise, self.spatial_cov),
+                        (waveform_length, n_chans_total))[:, chan_nums]
 
-        # the_noise = np.reshape(np.matmul(noise.T, self.temporal_cov).T, (-1, n_chans))
-        the_noise = torch.matmul(noise.T, self.temporal_cov).view(n_chans, -1)
+        the_noise = np.reshape(np.matmul(noise.T, self.temporal_cov).T, (-1, n_chans))
 
         # the_noise = np.reshape(np.matmul(reshaped_noise, self.spatial_cov),
         #                 (waveform_length, n_chans_total))
-        
-        # noise_start = np.random.choice(n_chans_total - n_chans)
             
-        # noise_to_add = the_noise.T
-        noise_to_add = the_noise.cpu().numpy()
+        noise_to_add = the_noise.T
         noise_to_add = self.normalize_wf(noise_to_add) if self.normalize else noise_to_add
         
         # noise_to_add = self.normalize_wf(the_noise[:, chan_nums].T) if self.normalize else the_noise[:, chan_nums].T
@@ -170,6 +163,82 @@ class SmartNoise(object):
         wf /= np.max(np.abs(wf),axis=0)
         wf = wf.reshape(n_chans, -1) if n_chans is not None else wf
         return wf
+    
+
+class TorchSmartNoise(object):
+    """Rescale the image in a sample to a given size.
+    Args:
+        output_size (tuple or int): Desired output size. If tuple, output is
+            matched to output_size. If int, smaller of image edges is matched
+            to output_size keeping aspect ratio the same.
+    """
+    root_folder = '/Users/ankit/Documents/PaninskiLab/contrastive_spikes/DY016/'
+    temporal_name = 'temporal_cov_example.npy'
+    spatial_name = 'spatial_cov_example.npy'
+
+    def __init__(self, root_folder=None, temporal_cov=None, spatial_cov=None, noise_scale=1.0, normalize=False, gpu=0, p=0.5):
+        if root_folder is not None:
+            self.root_folder = root_folder
+        if temporal_cov is None:
+            temporal_cov = np.load(os.path.join(self.root_folder, self.temporal_name))
+        if spatial_cov is None:
+            spatial_cov = np.load(os.path.join(self.root_folder, self.spatial_name))
+        self.temporal_cov = torch.from_numpy(temporal_cov).cuda(gpu,non_blocking=True).float()
+        self.spatial_cov = torch.from_numpy(spatial_cov).cuda(gpu,non_blocking=True).float()
+        # self.noise_scale = np.float64(noise_scale)
+        self.noise_scale = np.float32(noise_scale)
+        self.normalize = normalize
+        self.gpu = gpu
+        self.prob = p
+
+    def __call__(self, sample):
+        chan_locs = None
+        if len(sample) == 2:
+            wf, chan_nums = sample
+        elif len(sample) == 3:
+            wf, chan_nums, chan_locs = sample
+        else:
+            wf = sample
+        
+        if self.prob > torch.rand(1): 
+            if len(wf.shape) == 1:
+                wf = np.expand_dims(wf, axis=0)
+            n_chans = wf.shape[0]
+            w = wf.shape[1]
+
+            assert self.temporal_cov.shape[0] == w
+
+            n_chans_total, _ = self.spatial_cov.shape
+            waveform_length, _ = self.temporal_cov.shape
+
+            # pad channels that cross edges with edge chan numbers
+            if type(chan_nums) != np.int64: 
+                chan_nums[chan_nums > n_chans_total-1] = n_chans_total - 1
+                chan_nums[chan_nums < 0] = 0
+            chan_nums = chan_nums.astype(int) # sometimes chan_nums is a float
+
+            with torch.no_grad():
+                noise = torch.cuda.FloatTensor(waveform_length, n_chans_total).normal_()
+
+                noise = torch.matmul(noise, self.spatial_cov).view((waveform_length, n_chans_total))[:, chan_nums]
+
+                the_noise = torch.matmul(noise.T, self.temporal_cov).view(n_chans, -1)
+
+                noise_wfs = self.noise_scale * the_noise
+                wf = wf + noise_wfs
+        return wf
+    
+    def normalize_wf(self, wf):
+        if len(wf.shape) == 1:
+            _ = wf.shape
+            n_chans = None
+        else:
+            n_chans, _ = wf.shape
+        wf = wf.flatten()
+        wf /= np.max(np.abs(wf),axis=0)
+        wf = wf.reshape(n_chans, -1) if n_chans is not None else wf
+        return wf
+
 
 
 class Collide(object):
@@ -410,6 +479,7 @@ class ElectrodeDropout(object):
         wf[chan_mask == 0] = np.zeros(n_times)
         return wf
     
+
 class ToWfTensor(object):
     """Convert ndarrays in sample to Tensors."""
 
@@ -426,6 +496,31 @@ class ToWfTensor(object):
         
         if len(sample) == 3:
             return torch.from_numpy(wf.astype('float16')), chan_locs
+        elif len(sample) == 2:
+            return torch.from_numpy(wf.astype('float16'))
+        
+        return torch.from_numpy(wf.astype('float16'))
+    
+
+# For integration with TorchSmartNoise 
+class TorchToWfTensor(object):
+    """Convert ndarrays in sample to Tensors."""
+
+    def __call__(self, sample):
+        if len(sample) == 2:
+            wf, chan_nums = sample
+        elif len(sample) == 3:
+            wf, chan_nums, chan_locs = sample
+        else:
+            wf = sample
+            
+        if len(wf.shape) == 1:
+            wf = np.expand_dims(wf, axis=0)
+        
+        if len(sample) == 3:
+            return torch.from_numpy(wf.astype('float16')), chan_nums, chan_locs
+        elif len(sample) == 2:
+            return torch.from_numpy(wf.astype('float16')), chan_nums
         
         return torch.from_numpy(wf.astype('float16'))
     

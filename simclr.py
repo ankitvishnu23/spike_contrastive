@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 
+import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.multiprocessing as mp
@@ -9,6 +10,7 @@ import torch.distributed as dist
 
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.cuda.amp import GradScaler, autocast
+from torchvision.transforms import transforms
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 from utils import (
@@ -21,6 +23,7 @@ import tensorboard_logger as tb_logger
 torch.manual_seed(0)
 import time
 from load_models import save_reps
+from data_aug.wf_data_augs import TorchSmartNoise
 
 class SimCLR(object):
 
@@ -47,6 +50,8 @@ class SimCLR(object):
             logging.basicConfig(filename=os.path.join(self.args.log_dir, 'training.log'), level=logging.DEBUG)
         self.criterion = torch.nn.CrossEntropyLoss().cuda(self.gpu)
         self.start_epoch = kwargs['start_epoch']
+        # self.noise_transform = TorchSmartNoise(self.args.data, noise_scale=self.args.noise_scale, 
+        #                                                             normalize=self.args.cell_type, gpu=self.gpu)
 
     def info_nce_loss(self, features):
 
@@ -101,7 +106,7 @@ class SimCLR(object):
 
         # pca_score = knn_pca_score(self.args.out_dim, self.args.data)
         pca_score = 0
-
+        
         for epoch_counter in range(self.start_epoch, self.args.epochs):
             if self.args.add_train:
                 self.model.train()
@@ -117,11 +122,14 @@ class SimCLR(object):
                     wf, chan_pos = wf
                     chan_pos = torch.cat(chan_pos, dim=0).float()
                 wf = torch.cat(wf, dim=0).float()
-                lab = torch.cat(lab, dim=0).long().cuda(self.gpu,non_blocking=True)
+                # chan_nums = np.concatenate(chan_nums, axis=0)
+                lab = torch.cat(lab, dim=0).long().cuda(self.gpu)
                 
                 # wf = torch.squeeze(wf)
                 # if not self.multichan:
                 #     wf = torch.unsqueeze(wf, dim=1)
+
+                # wf = torch.stack([self.noise_transform([wf[i], chan_nums[i]]) for i in range(wf.shape[0])])
                 if self.args.use_gpt:
                     if not self.args.multi_chan:
                         wf = torch.squeeze(wf, dim=1)
@@ -129,10 +137,10 @@ class SimCLR(object):
                     else:
                         wf = wf.view(-1, (self.args.num_extra_chans*2+1)*121)
                         wf = torch.unsqueeze(wf, dim=-1)
-                wf = wf.cuda(self.gpu,non_blocking=True)
                 # wf = wf.float().cuda(self.args.device)
                 # time1 = time.time()
                 # print("time for loading batch:", time1 - time4)
+                wf = wf.cuda(self.gpu)
                 
                 with autocast(enabled=self.args.fp16):
                     if self.args.online_head:
