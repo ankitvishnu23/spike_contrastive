@@ -481,7 +481,7 @@ def make_dataset(bin_path, spike_index, geom, save_path, geom_dims=(1,2), we=Non
                 templates = templates[:, :, depth_order]
             else:
                 spike_frames_template = np.random.choice(spike_index[:,0][np.where(spike_index[:,2] == i)[0]], 
-                                                         size=num_waveforms)
+                                                         size=num_waveforms, replace=False)
                 waveforms, _ = read_waveforms(spike_frames_template, bin_path, channel_index=channel_index,
                                               n_channels=geom.shape[0], spike_length_samples=spike_length_samples)
             mc = np.unique(spike_index[:, 2][np.where(spike_index[:,1] == unit_id)[0]])[0]
