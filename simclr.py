@@ -50,8 +50,8 @@ class SimCLR(object):
             logging.basicConfig(filename=os.path.join(self.args.log_dir, 'training.log'), level=logging.DEBUG)
         self.criterion = torch.nn.CrossEntropyLoss().cuda(self.gpu)
         self.start_epoch = kwargs['start_epoch']
-        # self.noise_transform = TorchSmartNoise(self.args.data, noise_scale=self.args.noise_scale, 
-        #                                                             normalize=self.args.cell_type, gpu=self.gpu)
+        self.noise_transform = TorchSmartNoise(self.args.data, noise_scale=self.args.noise_scale, 
+                                                                    normalize=self.args.cell_type, gpu=self.gpu)
 
     def info_nce_loss(self, features):
 
@@ -115,21 +115,22 @@ class SimCLR(object):
                 self.sampler.set_epoch(epoch_counter)
             print('Epoch {}'.format(epoch_counter))
             # time4 = time.time()
-            for i, (wf, lab) in enumerate(train_loader):
+            for i, (wf, chan_nums, lab) in enumerate(train_loader):
                 # print(f"batch {i}")
                 chan_pos = None
                 if self.args.use_chan_pos:
                     wf, chan_pos = wf
                     chan_pos = torch.cat(chan_pos, dim=0).float()
                 wf = torch.cat(wf, dim=0).float()
-                # chan_nums = np.concatenate(chan_nums, axis=0)
+                chan_nums = np.concatenate(chan_nums, axis=0)
                 lab = torch.cat(lab, dim=0).long().cuda(self.gpu)
                 
                 # wf = torch.squeeze(wf)
                 # if not self.multichan:
                 #     wf = torch.unsqueeze(wf, dim=1)
+                wf = wf.cuda(self.gpu)
 
-                # wf = torch.stack([self.noise_transform([wf[i], chan_nums[i]]) for i in range(wf.shape[0])])
+                wf = torch.stack([self.noise_transform([wf[i], chan_nums[i]]) for i in range(wf.shape[0])])
                 if self.args.use_gpt:
                     if not self.args.multi_chan:
                         wf = torch.squeeze(wf, dim=1)
@@ -140,7 +141,6 @@ class SimCLR(object):
                 # wf = wf.float().cuda(self.args.device)
                 # time1 = time.time()
                 # print("time for loading batch:", time1 - time4)
-                wf = wf.cuda(self.gpu)
                 
                 with autocast(enabled=self.args.fp16):
                     if self.args.online_head:

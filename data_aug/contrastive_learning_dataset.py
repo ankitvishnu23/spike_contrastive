@@ -9,7 +9,7 @@ from torchvision import transforms, datasets
 from torch.utils.data import Dataset
 from data_aug.view_generator import ContrastiveLearningViewGenerator, LabelViewGenerator
 # from exceptions.exceptions import InvalidDatasetSelection
-from data_aug.wf_data_augs import AmpJitter, Jitter, Collide, SmartNoise, ToWfTensor, PCA_Reproj, Crop
+from data_aug.wf_data_augs import AmpJitter, Jitter, Collide, SmartNoise, ToWfTensor, PCA_Reproj, Crop, TorchToWfTensor
 from typing import Any, Callable, Optional, Tuple
 
 
@@ -144,9 +144,9 @@ class WF_MultiChan_Dataset(Dataset):
         if self.transform is not None and self.use_chan_pos:
             wf, chan_loc = self.transform([wf, chan_nums, chan_loc])
         elif self.transform is not None:
-            wf = self.transform([wf, chan_nums])
-            # wf = [ret_obj[0][0], ret_obj[1][0]]
-            # chan_nums = [ret_obj[0][1], ret_obj[1][1]]
+            ret_obj = self.transform([wf, chan_nums])
+            wf = [ret_obj[0][0], ret_obj[1][0]]
+            chan_nums = [ret_obj[0][1], ret_obj[1][1]]
 
         if self.target_transform is not None:
             y = self.target_transform(y)
@@ -154,7 +154,7 @@ class WF_MultiChan_Dataset(Dataset):
         if self.use_chan_pos:
             return [wf, chan_loc], y
             
-        return wf, y
+        return wf, chan_nums, y
 
 
     def __len__(self) -> int:
@@ -272,9 +272,9 @@ class ContrastiveLearningDataset:
                                             transforms.RandomApply([AmpJitter()], p=0.7),
                                               transforms.RandomApply([Jitter()], p=0.6),
                                             #   transforms.RandomApply([PCA_Reproj(root_folder=self.root_folder)], p=0.4),
-                                              transforms.RandomApply([SmartNoise(self.root_folder, temporal_cov, 
-                                                                                 spatial_cov, noise_scale, normalize)], p=0.5),
-                                              ToWfTensor()])
+                                            #   transforms.RandomApply([SmartNoise(self.root_folder, temporal_cov, 
+                                            #                                      spatial_cov, noise_scale, normalize)], p=0.5),
+                                              TorchToWfTensor()])
         
         return data_transforms
 
