@@ -12,7 +12,7 @@ install_requires = [
     "pandas",
     "pillow",
     "scikit-image",
-    "sklearn",
+    "scikit-learn",
     "tensorboard_logger",
     "tensorboard",
     "tensorboard_logger",
